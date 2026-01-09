@@ -20,10 +20,52 @@ This is a Unity 6000.3.2f1 (Unity 6) project configured with Universal Render Pi
 ```
 Assets/
 ├── Scenes/              # Unity scenes
+├── Scripts/             # Game scripts and components
+│   └── Editor/          # Editor tools and automation
 ├── Settings/            # Project-specific settings
 ├── TutorialInfo/        # Template tutorial assets
 └── InputSystem_Actions.inputactions  # Input Action asset
 ```
+
+## Development Workflow with Claude Code
+
+### Iterative Development Cycle
+
+When working with Claude Code on this Unity project, follow this workflow:
+
+1. **Claude Code Updates Scripts**: Claude modifies C# files in `Assets/Scripts/`
+2. **Unity Auto-Compiles**: Unity Editor detects file changes and recompiles automatically
+   - Watch the bottom-right corner for the spinning icon (compiling)
+   - Wait until it says "Ready" or the spinner disappears
+   - **There is no command to force compilation** - Unity handles this internally
+3. **User Tests in Unity Editor**: Press Play to test changes
+4. **Provide Feedback**: Report what works/doesn't work
+5. **Iterate**: Repeat steps 1-4 until feature is complete
+
+### Automated Setup Tools
+
+This project includes Editor tools for quick setup:
+- **Tools → Third Person → Auto Setup Scene**: Creates player, camera, and ground automatically
+- **Tools → Third Person → Remove Setup**: Cleans up the scene setup
+- These tools handle GameObject creation, component configuration, and linking
+
+### Real-Time Value Tuning
+
+For faster iteration when adjusting parameters:
+1. Enter **Play Mode** in Unity Editor
+2. Select the GameObject (e.g., Main Camera, Player)
+3. Modify serialized fields directly in the Inspector
+4. See changes **immediately** without stopping/restarting
+5. Once satisfied, note the values and have Claude update the script defaults
+
+**Note**: Changes made during Play Mode are lost when exiting Play Mode, so always have Claude update the script with final values.
+
+### Script Compilation Limitations
+
+- Unity Editor must be running for compilation to occur
+- Compilation happens automatically when Unity detects file changes
+- No external command-line tool can trigger Unity's internal compiler
+- Asset refreshing (Assets → Refresh or Ctrl+R) can help if changes aren't detected
 
 ## Unity Editor Workflow
 

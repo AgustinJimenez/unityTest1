@@ -21,15 +21,41 @@ public class ThirdPersonController : MonoBehaviour
     private CharacterController controller;
     private Vector3 velocity;
     private bool isGrounded;
-    private Vector2 moveInput;
-    private bool sprintInput;
     private float currentSpeed;
     private Transform cameraTransform;
+
+    // Direct Input Action references
+    private InputAction moveAction;
+    private InputAction jumpAction;
+    private InputAction sprintAction;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
         cameraTransform = Camera.main.transform;
+
+        // Get the Input Actions directly
+        var playerInput = GetComponent<PlayerInput>();
+        if (playerInput != null)
+        {
+            moveAction = playerInput.actions["Move"];
+            jumpAction = playerInput.actions["Jump"];
+            sprintAction = playerInput.actions["Sprint"];
+        }
+    }
+
+    private void OnEnable()
+    {
+        if (moveAction != null) moveAction.Enable();
+        if (jumpAction != null) jumpAction.Enable();
+        if (sprintAction != null) sprintAction.Enable();
+    }
+
+    private void OnDisable()
+    {
+        if (moveAction != null) moveAction.Disable();
+        if (jumpAction != null) jumpAction.Disable();
+        if (sprintAction != null) sprintAction.Disable();
     }
 
     private void Update()
@@ -37,15 +63,14 @@ public class ThirdPersonController : MonoBehaviour
         CheckGround();
         HandleMovement();
         HandleGravity();
+        HandleJump();
     }
 
     private void CheckGround()
     {
-        // Ground check using raycast from center of capsule
         Vector3 spherePosition = transform.position - new Vector3(0, controller.height / 2 - controller.radius, 0);
         isGrounded = Physics.CheckSphere(spherePosition, controller.radius + groundCheckDistance, groundMask);
 
-        // Reset velocity when grounded
         if (isGrounded && velocity.y < 0)
         {
             velocity.y = -2f;
@@ -54,11 +79,14 @@ public class ThirdPersonController : MonoBehaviour
 
     private void HandleMovement()
     {
-        // Get input relative to camera direction
+        if (moveAction == null || cameraTransform == null) return;
+
+        // Read movement input
+        Vector2 moveInput = moveAction.ReadValue<Vector2>();
+
+        // Get camera-relative directions
         Vector3 forward = cameraTransform.forward;
         Vector3 right = cameraTransform.right;
-
-        // Flatten the vectors to only move on horizontal plane
         forward.y = 0;
         right.y = 0;
         forward.Normalize();
@@ -67,21 +95,21 @@ public class ThirdPersonController : MonoBehaviour
         // Calculate movement direction
         Vector3 desiredMoveDirection = forward * moveInput.y + right * moveInput.x;
 
-        // Calculate target speed based on sprint
-        float targetSpeed = sprintInput ? sprintSpeed : walkSpeed;
+        // Check if sprinting
+        bool isSprinting = sprintAction != null && sprintAction.IsPressed();
+        float targetSpeed = isSprinting ? sprintSpeed : walkSpeed;
 
-        // Smoothly accelerate to target speed
+        // Smoothly accelerate
         if (desiredMoveDirection.magnitude > 0.1f)
         {
             currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, acceleration * Time.deltaTime);
 
-            // Rotate character to face movement direction
+            // Rotate character
             Quaternion targetRotation = Quaternion.LookRotation(desiredMoveDirection);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
         else
         {
-            // Decelerate when no input
             currentSpeed = Mathf.Lerp(currentSpeed, 0, acceleration * Time.deltaTime);
         }
 
@@ -92,33 +120,20 @@ public class ThirdPersonController : MonoBehaviour
 
     private void HandleGravity()
     {
-        // Apply gravity
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
     }
 
-    // Input System callbacks
-    public void OnMove(InputAction.CallbackContext context)
+    private void HandleJump()
     {
-        moveInput = context.ReadValue<Vector2>();
-    }
-
-    public void OnJump(InputAction.CallbackContext context)
-    {
-        if (context.performed && isGrounded)
+        if (jumpAction != null && jumpAction.WasPressedThisFrame() && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
         }
     }
 
-    public void OnSprint(InputAction.CallbackContext context)
-    {
-        sprintInput = context.ReadValueAsButton();
-    }
-
     private void OnDrawGizmosSelected()
     {
-        // Visualize ground check sphere
         if (controller != null)
         {
             Vector3 spherePosition = transform.position - new Vector3(0, controller.height / 2 - controller.radius, 0);
