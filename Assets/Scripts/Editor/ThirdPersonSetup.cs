@@ -475,6 +475,10 @@ public class ThirdPersonSetup : EditorWindow
                 Debug.Log($"  ✓ Changed shader to URP/Lit");
             }
 
+            // Get the material name for later use
+            string materialName = material.name;
+            string prefix = materialName.Split('_')[0];
+
             // IMPORTANT: Set to Specular workflow
             if (material.HasProperty("_WorkflowMode"))
             {
@@ -487,13 +491,19 @@ public class ThirdPersonSetup : EditorWindow
             // Set material colors and properties
             material.SetColor("_BaseColor", Color.white);
             material.SetColor("_SpecColor", Color.white);
-            material.SetFloat("_Smoothness", 0.5f);
+
+            // Adjust smoothness based on material type
+            if (materialName.ToLower().Contains("hair"))
+            {
+                material.SetFloat("_Smoothness", 0.3f); // Less shiny for hair
+                Debug.Log("  Set hair smoothness to 0.3");
+            }
+            else
+            {
+                material.SetFloat("_Smoothness", 0.5f); // Default for body
+            }
 
             EditorUtility.SetDirty(material);
-
-            // Get the material name prefix (e.g., "Ch31" from "Ch31_body")
-            string materialName = material.name;
-            string prefix = materialName.Split('_')[0];
 
             // Find textures with matching prefix
             string[] textureGuids = AssetDatabase.FindAssets($"{prefix} t:Texture2D", new[] { "Assets/Characters" });
@@ -631,6 +641,9 @@ public class ThirdPersonSetup : EditorWindow
 
         // Force reload materials on character instance in scene
         ReloadCharacterMaterials();
+
+        // Create and apply special eyelash material
+        CreateEyelashMaterial();
     }
 
     private static void ConvertMaterialsToURP()
@@ -772,6 +785,90 @@ public class ThirdPersonSetup : EditorWindow
         }
 
         Debug.Log("Character materials reloaded from extracted assets");
+    }
+
+    private static void CreateEyelashMaterial()
+    {
+        Debug.Log("=== CREATING EYELASH MATERIAL ===");
+
+        // Find the Player and eyelash mesh
+        GameObject player = GameObject.Find("Player");
+        if (player == null) return;
+
+        Transform characterModel = player.transform.Find("CharacterModel");
+        if (characterModel == null) return;
+
+        // Look for eyelash mesh
+        SkinnedMeshRenderer[] renderers = characterModel.GetComponentsInChildren<SkinnedMeshRenderer>();
+        SkinnedMeshRenderer eyelashRenderer = null;
+
+        foreach (var renderer in renderers)
+        {
+            if (renderer.name.ToLower().Contains("eyelash"))
+            {
+                eyelashRenderer = renderer;
+                Debug.Log($"Found eyelash mesh: {renderer.name}");
+                break;
+            }
+        }
+
+        if (eyelashRenderer == null)
+        {
+            Debug.Log("No eyelash mesh found");
+            return;
+        }
+
+        // Create eyelash material
+        Material eyelashMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        eyelashMaterial.name = "Ch31_eyelashes";
+
+        // Set to Alpha Cutout for transparency
+        eyelashMaterial.SetFloat("_Surface", 0); // 0 = Opaque, 1 = Transparent
+        eyelashMaterial.SetFloat("_AlphaClip", 1); // Enable alpha clipping
+        eyelashMaterial.SetFloat("_Cutoff", 0.5f); // Alpha cutoff threshold
+
+        // Use hair texture as base
+        string[] textureGuids = AssetDatabase.FindAssets("Ch31_1002_Diffuse t:Texture2D", new[] { "Assets/Characters" });
+        if (textureGuids.Length > 0)
+        {
+            string texturePath = AssetDatabase.GUIDToAssetPath(textureGuids[0]);
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (texture != null)
+            {
+                eyelashMaterial.SetTexture("_BaseMap", texture);
+                Debug.Log("Assigned hair texture to eyelashes");
+            }
+        }
+
+        // Make it lighter/more subtle (dark brown instead of black)
+        eyelashMaterial.SetColor("_BaseColor", new Color(0.3f, 0.2f, 0.15f, 1f));
+
+        // Two-sided rendering
+        eyelashMaterial.SetFloat("_Cull", 0); // 0 = Off (both sides), 2 = Back (front only)
+
+        // Specular workflow
+        eyelashMaterial.SetFloat("_WorkflowMode", 1f);
+        eyelashMaterial.EnableKeyword("_SPECULAR_SETUP");
+
+        // Less shiny
+        eyelashMaterial.SetFloat("_Smoothness", 0.1f);
+
+        // Save material to disk
+        string materialsFolder = "Assets/Characters/leonard/Materials";
+        if (!AssetDatabase.IsValidFolder(materialsFolder))
+        {
+            materialsFolder = "Assets/Characters/Materials";
+        }
+
+        string materialPath = $"{materialsFolder}/Ch31_eyelashes.mat";
+        AssetDatabase.CreateAsset(eyelashMaterial, materialPath);
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"Created eyelash material at {materialPath}");
+
+        // Apply to eyelash renderer
+        eyelashRenderer.sharedMaterial = eyelashMaterial;
+        Debug.Log("Applied eyelash material to mesh");
     }
 
     private static void EnsureNormalMapSettings(string texturePath)

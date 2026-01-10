@@ -173,6 +173,27 @@ bool isPreferredTexture = string.IsNullOrEmpty(preferredTextureNumber)
 - Increase directional light intensity to 2-3 for better visibility
 - Mixamo characters can appear dark without proper ambient lighting
 
+**Eyelash Rendering Fix:**
+Mixamo eyelashes often appear as thick black bars in Unity instead of subtle, natural lashes. This is because:
+- Eyelashes use the hair material by default (too dark and opaque)
+- They need alpha clipping and two-sided rendering to look natural
+
+Solution - create a dedicated eyelash material:
+```csharp
+Material eyelashMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+eyelashMaterial.SetFloat("_AlphaClip", 1); // Enable alpha clipping
+eyelashMaterial.SetFloat("_Cutoff", 0.5f); // Transparency threshold
+eyelashMaterial.SetFloat("_Cull", 0); // Two-sided rendering
+eyelashMaterial.SetColor("_BaseColor", new Color(0.3f, 0.2f, 0.15f, 1f)); // Dark brown, not black
+eyelashMaterial.SetFloat("_Smoothness", 0.1f); // Not shiny
+```
+
+**Hair Material Settings:**
+To reduce the blocky/chunky appearance of low-poly hair:
+- Set smoothness to 0.3 (less shiny makes geometry less obvious)
+- Ensure normal map is assigned (adds surface detail)
+- Two-sided rendering may help depending on the model
+
 See `Assets/Scripts/Editor/ThirdPersonSetup.cs` for the complete implementation of automated Mixamo character setup.
 
 ## Editor Scripts
