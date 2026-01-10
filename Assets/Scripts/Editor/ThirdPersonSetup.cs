@@ -1,71 +1,88 @@
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.InputSystem;
+using System.IO;
 
 public class ThirdPersonSetup : EditorWindow
 {
-    [MenuItem("Tools/Third Person/Auto Setup Scene")]
-    public static void SetupThirdPersonScene()
+    [MenuItem("Tools/Third Person/Complete Setup")]
+    public static void CompleteSetup()
     {
-        if (EditorUtility.DisplayDialog("Third Person Setup",
-            "This will create a Player capsule, configure the camera, and add a ground plane to your scene. Continue?",
-            "Yes, Set It Up!",
-            "Cancel"))
-        {
-            CreateThirdPersonScene();
-        }
+        PerformCompleteSetup();
     }
 
-    private static void CreateThirdPersonScene()
+    private static void PerformCompleteSetup()
     {
-        // Create Ground
+        // Step 1: Clean up existing setup first
+        CleanupExistingSetup();
+
+        // Step 3: Create Ground
         GameObject ground = CreateGround();
 
-        // Create Player
+        // Step 4: Add lighting if missing
+        EnsureLighting();
+
+        // Step 5: Create Player with capsule
         GameObject player = CreatePlayer();
 
-        // Setup Camera
+        // Step 5: Setup Camera
         SetupCamera(player);
+
+        // Step 6: Try to find and apply character model
+        bool characterApplied = TryApplyCharacterModel(player);
+
+        // Step 7: Fix materials after character is applied (to connect textures)
+        if (characterApplied)
+        {
+            FixMaterialTextures();
+        }
 
         // Select the player for easy inspection
         Selection.activeGameObject = player;
-
-        // Focus scene view on player
         SceneView.lastActiveSceneView?.FrameSelected();
 
-        EditorUtility.DisplayDialog("Setup Complete!",
-            "Third-person scene setup complete!\n\n" +
-            "Created:\n" +
-            "- Player (Capsule with CharacterController)\n" +
-            "- Main Camera (with ThirdPersonCamera)\n" +
-            "- Ground Plane\n\n" +
-            "Press PLAY to test!\n\n" +
-            "Controls:\n" +
-            "WASD - Move\n" +
-            "Mouse - Look\n" +
-            "Space - Jump\n" +
-            "Shift - Sprint",
-            "Awesome!");
+        // Log completion
+        Debug.Log("=== THIRD PERSON SETUP COMPLETE ===");
+        Debug.Log($"Created: Player {(characterApplied ? "(with character model)" : "(capsule)")}, Camera, Ground");
+        Debug.Log("Press PLAY to test! Controls: WASD=Move, Mouse=Look, Space=Jump, Shift=Sprint");
+    }
 
-        Debug.Log("Third Person Setup Complete! Press Play to test.");
+    private static void CleanupExistingSetup()
+    {
+        // Remove existing Player
+        GameObject existingPlayer = GameObject.Find("Player");
+        if (existingPlayer != null)
+        {
+            Undo.DestroyObjectImmediate(existingPlayer);
+        }
+
+        // Remove existing Ground
+        GameObject existingGround = GameObject.Find("Ground");
+        if (existingGround != null)
+        {
+            Undo.DestroyObjectImmediate(existingGround);
+        }
+
+        // Clean up camera script
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            ThirdPersonCamera existingCameraScript = mainCamera.GetComponent<ThirdPersonCamera>();
+            if (existingCameraScript != null)
+            {
+                Undo.DestroyObjectImmediate(existingCameraScript);
+            }
+        }
     }
 
     private static GameObject CreateGround()
     {
-        // Check if ground already exists and delete it
-        GameObject existingGround = GameObject.Find("Ground");
-        if (existingGround != null)
-        {
-            Debug.Log("Removing existing Ground...");
-            Undo.DestroyObjectImmediate(existingGround);
-        }
-
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.name = "Ground";
         ground.transform.position = Vector3.zero;
         ground.transform.localScale = new Vector3(5, 1, 5);
 
-        // Add a material for better visibility (optional)
+        // Add a material for better visibility
         Renderer renderer = ground.GetComponent<Renderer>();
         if (renderer != null)
         {
@@ -75,20 +92,55 @@ public class ThirdPersonSetup : EditorWindow
         }
 
         Undo.RegisterCreatedObjectUndo(ground, "Create Ground");
-        Debug.Log("Created Ground plane");
         return ground;
+    }
+
+    private static void EnsureLighting()
+    {
+        // Set ambient lighting for better visibility - using Skybox mode with high intensity
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.7f, 0.7f, 0.7f); // Bright gray ambient
+        RenderSettings.ambientIntensity = 1.5f; // Boost ambient intensity
+
+        // Remove skybox to use flat color (simpler, brighter)
+        RenderSettings.skybox = null;
+        RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Custom;
+
+        Debug.Log("Set ambient lighting (Flat mode with high intensity)");
+
+        // Check if there's already a directional light
+        Light[] existingLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+        bool hasDirectionalLight = false;
+        foreach (Light existingLight in existingLights)
+        {
+            if (existingLight.type == LightType.Directional)
+            {
+                hasDirectionalLight = true;
+                // Update existing light to be much brighter
+                existingLight.intensity = 3f;
+                Debug.Log("Updated existing directional light intensity to 3");
+            }
+        }
+
+        if (!hasDirectionalLight)
+        {
+            // Create a directional light
+            GameObject lightGameObject = new GameObject("Directional Light");
+            Light lightComponent = lightGameObject.AddComponent<Light>();
+            lightComponent.type = LightType.Directional;
+            lightComponent.color = Color.white;
+            lightComponent.intensity = 3f;
+
+            // Position and rotate the light (standard Unity setup)
+            lightGameObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            Undo.RegisterCreatedObjectUndo(lightGameObject, "Create Directional Light");
+            Debug.Log("Created directional light with intensity 3");
+        }
     }
 
     private static GameObject CreatePlayer()
     {
-        // Check if player already exists and delete it
-        GameObject existingPlayer = GameObject.Find("Player");
-        if (existingPlayer != null)
-        {
-            Debug.Log("Removing existing Player...");
-            Undo.DestroyObjectImmediate(existingPlayer);
-        }
-
         // Create capsule
         GameObject player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         player.name = "Player";
@@ -108,7 +160,7 @@ public class ThirdPersonSetup : EditorWindow
         characterController.center = Vector3.zero;
 
         // Add ThirdPersonController
-        ThirdPersonController controller = player.AddComponent<ThirdPersonController>();
+        player.AddComponent<ThirdPersonController>();
 
         // Add PlayerInput
         PlayerInput playerInput = player.AddComponent<PlayerInput>();
@@ -125,12 +177,7 @@ public class ThirdPersonSetup : EditorWindow
                 playerInput.actions = inputActions;
                 playerInput.defaultActionMap = "Player";
                 playerInput.notificationBehavior = PlayerNotifications.InvokeCSharpEvents;
-                Debug.Log("Assigned InputSystem_Actions to Player Input");
             }
-        }
-        else
-        {
-            Debug.LogWarning("Could not find InputSystem_Actions asset. Please assign it manually to the Player Input component.");
         }
 
         // Change capsule color for better visibility
@@ -143,7 +190,6 @@ public class ThirdPersonSetup : EditorWindow
         }
 
         Undo.RegisterCreatedObjectUndo(player, "Create Player");
-        Debug.Log("Created Player with CharacterController and ThirdPersonController");
         return player;
     }
 
@@ -157,70 +203,652 @@ public class ThirdPersonSetup : EditorWindow
             return;
         }
 
-        // Remove existing ThirdPersonCamera if present
-        ThirdPersonCamera existingCameraScript = mainCamera.GetComponent<ThirdPersonCamera>();
-        if (existingCameraScript != null)
-        {
-            Debug.Log("Removing existing ThirdPersonCamera from Main Camera...");
-            Undo.DestroyObjectImmediate(existingCameraScript);
-        }
-
         // Add fresh ThirdPersonCamera
         ThirdPersonCamera cameraScript = mainCamera.gameObject.AddComponent<ThirdPersonCamera>();
         Undo.RegisterCreatedObjectUndo(cameraScript, "Add Third Person Camera");
 
-        // Assign player as target using SerializedObject for proper Undo support
+        // Assign player as target
         SerializedObject serializedCamera = new SerializedObject(cameraScript);
         SerializedProperty targetProperty = serializedCamera.FindProperty("target");
         targetProperty.objectReferenceValue = player.transform;
         serializedCamera.ApplyModifiedProperties();
-
-        Debug.Log("Configured Main Camera with ThirdPersonCamera targeting Player");
     }
 
-    [MenuItem("Tools/Third Person/Remove Setup")]
-    public static void RemoveSetup()
+    private static bool TryApplyCharacterModel(GameObject player)
     {
-        if (EditorUtility.DisplayDialog("Remove Third Person Setup",
-            "This will remove the Player and Ground objects from the scene. Continue?",
-            "Yes, Remove",
-            "Cancel"))
+        // Try to find character model (looking for common Mixamo character names and formats)
+        string[] searchTerms = { "leonard", "leonard_character", "character", "mixamo" };
+        GameObject characterPrefab = null;
+
+        foreach (string term in searchTerms)
         {
-            GameObject player = GameObject.Find("Player");
-            GameObject ground = GameObject.Find("Ground");
-
-            if (player != null)
+            // Search for both FBX and DAE models
+            string[] guids = AssetDatabase.FindAssets(term + " t:GameObject");
+            if (guids.Length > 0)
             {
-                Undo.DestroyObjectImmediate(player);
-                Debug.Log("Removed Player");
-            }
-
-            if (ground != null)
-            {
-                Undo.DestroyObjectImmediate(ground);
-                Debug.Log("Removed Ground");
-            }
-
-            // Optionally remove camera component
-            Camera mainCamera = Camera.main;
-            if (mainCamera != null)
-            {
-                ThirdPersonCamera cameraScript = mainCamera.GetComponent<ThirdPersonCamera>();
-                if (cameraScript != null)
+                // Prefer DAE files if available (better texture support)
+                foreach (string guid in guids)
                 {
-                    Undo.DestroyObjectImmediate(cameraScript);
-                    Debug.Log("Removed ThirdPersonCamera from Main Camera");
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (path.EndsWith(".dae") || path.EndsWith(".fbx"))
+                    {
+                        characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                        if (characterPrefab != null)
+                        {
+                            break;
+                        }
+                    }
+                }
+                if (characterPrefab != null) break;
+            }
+        }
+
+        if (characterPrefab == null)
+        {
+            return false;
+        }
+
+        // Remove capsule visuals
+        MeshRenderer meshRenderer = player.GetComponent<MeshRenderer>();
+        MeshFilter meshFilter = player.GetComponent<MeshFilter>();
+
+        if (meshRenderer != null)
+        {
+            Undo.DestroyObjectImmediate(meshRenderer);
+        }
+
+        if (meshFilter != null)
+        {
+            Undo.DestroyObjectImmediate(meshFilter);
+        }
+
+        // Check if it's a DAE file and extract materials if needed
+        string prefabPath = AssetDatabase.GetAssetPath(characterPrefab);
+        if (prefabPath.EndsWith(".dae"))
+        {
+            ExtractMaterialsFromModel(prefabPath);
+        }
+
+        // Instantiate character as child
+        GameObject characterInstance = (GameObject)PrefabUtility.InstantiatePrefab(characterPrefab, player.transform);
+        characterInstance.name = "CharacterModel";
+        characterInstance.transform.localPosition = Vector3.zero;
+        characterInstance.transform.localRotation = Quaternion.identity;
+
+        // DAE files from Mixamo are often 100x too big, scale them down
+        if (prefabPath.EndsWith(".dae"))
+        {
+            characterInstance.transform.localScale = Vector3.one * 0.01f; // Scale down 100x
+        }
+        else
+        {
+            characterInstance.transform.localScale = Vector3.one;
+        }
+
+        Undo.RegisterCreatedObjectUndo(characterInstance, "Add Character Model");
+
+        // Check for materials, apply simple ones if needed
+        bool hasMaterials = CheckForMaterials(characterInstance);
+        if (!hasMaterials)
+        {
+            ApplySimpleMaterials(characterInstance);
+        }
+
+        // Adjust CharacterController to fit the character
+        CharacterController controller = player.GetComponent<CharacterController>();
+        if (controller != null)
+        {
+            Renderer[] renderers = characterInstance.GetComponentsInChildren<Renderer>();
+            if (renderers.Length > 0)
+            {
+                Bounds bounds = renderers[0].bounds;
+                foreach (Renderer r in renderers)
+                {
+                    bounds.Encapsulate(r.bounds);
+                }
+
+                Vector3 localMin = player.transform.InverseTransformPoint(bounds.min);
+                Vector3 localMax = player.transform.InverseTransformPoint(bounds.max);
+
+                float height = Mathf.Abs(localMax.y - localMin.y);
+                float radius = Mathf.Max(Mathf.Abs(localMax.x - localMin.x), Mathf.Abs(localMax.z - localMin.z)) * 0.5f;
+                Vector3 center = new Vector3(0, height * 0.5f, 0);
+
+                Undo.RecordObject(controller, "Adjust Character Controller");
+                controller.height = height;
+                controller.radius = radius;
+                controller.center = center;
+            }
+        }
+
+        // Add Animator
+        Animator animator = characterInstance.GetComponent<Animator>();
+        if (animator == null)
+        {
+            animator = characterInstance.AddComponent<Animator>();
+            Undo.RegisterCreatedObjectUndo(animator, "Add Animator");
+        }
+
+        return true;
+    }
+
+    private static bool CheckForMaterials(GameObject characterInstance)
+    {
+        SkinnedMeshRenderer[] skinnedRenderers = characterInstance.GetComponentsInChildren<SkinnedMeshRenderer>();
+        MeshRenderer[] meshRenderers = characterInstance.GetComponentsInChildren<MeshRenderer>();
+
+        foreach (SkinnedMeshRenderer renderer in skinnedRenderers)
+        {
+            if (renderer.sharedMaterials != null && renderer.sharedMaterials.Length > 0)
+            {
+                foreach (Material mat in renderer.sharedMaterials)
+                {
+                    if (mat != null && mat.shader != null)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        foreach (MeshRenderer renderer in meshRenderers)
+        {
+            if (renderer.sharedMaterials != null && renderer.sharedMaterials.Length > 0)
+            {
+                foreach (Material mat in renderer.sharedMaterials)
+                {
+                    if (mat != null && mat.shader != null)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static void ApplySimpleMaterials(GameObject characterInstance)
+    {
+        Material skinMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        skinMaterial.color = new Color(0.9f, 0.7f, 0.6f);
+
+        Material clothesMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        clothesMaterial.color = new Color(0.2f, 0.3f, 0.5f);
+
+        Material hairMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        hairMaterial.color = new Color(0.3f, 0.2f, 0.1f);
+
+        SkinnedMeshRenderer[] skinnedRenderers = characterInstance.GetComponentsInChildren<SkinnedMeshRenderer>();
+        MeshRenderer[] meshRenderers = characterInstance.GetComponentsInChildren<MeshRenderer>();
+
+        foreach (SkinnedMeshRenderer renderer in skinnedRenderers)
+        {
+            string meshName = renderer.name.ToLower();
+            Material[] materials = new Material[renderer.sharedMaterials.Length];
+
+            for (int i = 0; i < materials.Length; i++)
+            {
+                if (meshName.Contains("hair") || meshName.Contains("head"))
+                {
+                    materials[i] = hairMaterial;
+                }
+                else if (meshName.Contains("body") || meshName.Contains("torso"))
+                {
+                    materials[i] = clothesMaterial;
+                }
+                else
+                {
+                    materials[i] = skinMaterial;
                 }
             }
 
-            Debug.Log("Third Person Setup removed");
+            renderer.sharedMaterials = materials;
+        }
+
+        foreach (MeshRenderer renderer in meshRenderers)
+        {
+            string meshName = renderer.name.ToLower();
+            Material[] materials = new Material[renderer.sharedMaterials.Length];
+
+            for (int i = 0; i < materials.Length; i++)
+            {
+                if (meshName.Contains("hair") || meshName.Contains("head"))
+                {
+                    materials[i] = hairMaterial;
+                }
+                else if (meshName.Contains("body") || meshName.Contains("torso"))
+                {
+                    materials[i] = clothesMaterial;
+                }
+                else
+                {
+                    materials[i] = skinMaterial;
+                }
+            }
+
+            renderer.sharedMaterials = materials;
         }
     }
 
-    [MenuItem("Tools/Third Person/Open Setup Guide")]
-    public static void OpenSetupGuide()
+    private static void FixMaterialTextures()
     {
-        string guidePath = "Assets/../THIRD_PERSON_SETUP.md";
-        System.Diagnostics.Process.Start(guidePath);
+        Debug.Log("=== FIXING MATERIAL TEXTURES ===");
+
+        // Find all materials in Characters folder and subfolders
+        string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { "Assets/Characters" });
+
+        if (materialGuids.Length == 0)
+        {
+            Debug.LogWarning("⚠️ No materials found in Assets/Characters - materials may not have been extracted!");
+            return; // No materials to fix
+        }
+
+        Debug.Log($"✓ Found {materialGuids.Length} materials to process");
+
+        foreach (string guid in materialGuids)
+        {
+            string materialPath = AssetDatabase.GUIDToAssetPath(guid);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+
+            if (material == null) continue;
+
+            Debug.Log($"========================================");
+            Debug.Log($"Processing: {material.name}");
+            Debug.Log($"  Path: {materialPath}");
+            Debug.Log($"  Current Shader: {material.shader.name}");
+
+            // Log BEFORE state
+            Texture beforeBaseMap = material.GetTexture("_BaseMap");
+            float beforeWorkflow = material.HasProperty("_WorkflowMode") ? material.GetFloat("_WorkflowMode") : -1f;
+            Color beforeColor = material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") : Color.black;
+
+            Debug.Log($"  BEFORE - BaseMap: {(beforeBaseMap != null ? beforeBaseMap.name : "NULL")}");
+            Debug.Log($"  BEFORE - WorkflowMode: {beforeWorkflow} (0=Metallic, 1=Specular)");
+            Debug.Log($"  BEFORE - BaseColor: {beforeColor}");
+
+            // Ensure material uses URP Lit shader
+            Shader urpShader = Shader.Find("Universal Render Pipeline/Lit");
+            if (material.shader != urpShader)
+            {
+                material.shader = urpShader;
+                Debug.Log($"  ✓ Changed shader to URP/Lit");
+            }
+
+            // IMPORTANT: Set to Specular workflow
+            if (material.HasProperty("_WorkflowMode"))
+            {
+                material.SetFloat("_WorkflowMode", 1f); // 1 = Specular
+                material.EnableKeyword("_SPECULAR_SETUP");
+                material.DisableKeyword("_METALLICSPECGLOSSMAP");
+                Debug.Log($"  ✓ Set to Specular workflow");
+            }
+
+            // Set material colors and properties
+            material.SetColor("_BaseColor", Color.white);
+            material.SetColor("_SpecColor", Color.white);
+            material.SetFloat("_Smoothness", 0.5f);
+
+            EditorUtility.SetDirty(material);
+
+            // Get the material name prefix (e.g., "Ch31" from "Ch31_body")
+            string materialName = material.name;
+            string prefix = materialName.Split('_')[0];
+
+            // Find textures with matching prefix
+            string[] textureGuids = AssetDatabase.FindAssets($"{prefix} t:Texture2D", new[] { "Assets/Characters" });
+
+            if (textureGuids.Length == 0)
+            {
+                Debug.LogWarning($"  ⚠️ No textures found for prefix '{prefix}'");
+            }
+            else
+            {
+                Debug.Log($"  Found {textureGuids.Length} textures for prefix '{prefix}'");
+            }
+
+            int texturesAssigned = 0;
+            bool diffuseAssigned = false; // Track if we already assigned a diffuse texture
+
+            // Determine which texture set to use based on material name
+            // For Mixamo characters: 1001 = body/skin, 1002 = hair
+            string preferredTextureNumber = "";
+            if (materialName.ToLower().Contains("hair"))
+            {
+                preferredTextureNumber = "1002"; // Hair textures
+                Debug.Log($"  Material is HAIR, preferring 1002 textures");
+            }
+            else if (materialName.ToLower().Contains("body"))
+            {
+                preferredTextureNumber = "1001"; // Body textures
+                Debug.Log($"  Material is BODY, preferring 1001 textures");
+            }
+
+            foreach (string texGuid in textureGuids)
+            {
+                string texturePath = AssetDatabase.GUIDToAssetPath(texGuid);
+                string textureName = Path.GetFileNameWithoutExtension(texturePath);
+                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+
+                if (texture == null) continue;
+
+                // Assign textures directly (SerializedProperty approach was failing)
+                if (textureName.Contains("Diffuse") || textureName.Contains("BaseColor"))
+                {
+                    // Only assign diffuse if it matches the preferred texture number
+                    bool isPreferredTexture = string.IsNullOrEmpty(preferredTextureNumber) || textureName.Contains(preferredTextureNumber);
+
+                    if (!diffuseAssigned && isPreferredTexture)
+                    {
+                        material.SetTexture("_BaseMap", texture);
+                        Debug.Log($"    ✓ Assigned {textureName} to _BaseMap");
+                        texturesAssigned++;
+                        diffuseAssigned = true;
+                    }
+                    else if (!isPreferredTexture)
+                    {
+                        Debug.Log($"    Skipped {textureName} (not preferred texture set)");
+                    }
+                    else
+                    {
+                        Debug.Log($"    Skipped {textureName} (diffuse already assigned)");
+                    }
+                }
+                else if (textureName.Contains("Normal"))
+                {
+                    bool isPreferredTexture = string.IsNullOrEmpty(preferredTextureNumber) || textureName.Contains(preferredTextureNumber);
+                    if (isPreferredTexture)
+                    {
+                        EnsureNormalMapSettings(texturePath);
+                        material.SetTexture("_BumpMap", texture);
+                        material.EnableKeyword("_NORMALMAP");
+                        Debug.Log($"    ✓ Assigned {textureName} to _BumpMap");
+                        texturesAssigned++;
+                    }
+                    else
+                    {
+                        Debug.Log($"    Skipped {textureName} (not preferred texture set)");
+                    }
+                }
+                else if (textureName.Contains("Specular"))
+                {
+                    bool isPreferredTexture = string.IsNullOrEmpty(preferredTextureNumber) || textureName.Contains(preferredTextureNumber);
+                    if (isPreferredTexture)
+                    {
+                        material.SetTexture("_SpecGlossMap", texture);
+                        Debug.Log($"    ✓ Assigned {textureName} to _SpecGlossMap");
+                        texturesAssigned++;
+                    }
+                    else
+                    {
+                        Debug.Log($"    Skipped {textureName} (not preferred texture set)");
+                    }
+                }
+                else if (textureName.Contains("Glossiness"))
+                {
+                    // For Specular workflow, Glossiness goes in the alpha of SpecGlossMap
+                    Debug.Log($"    Found Glossiness texture: {textureName} (embedded in Specular)");
+                }
+            }
+
+            if (texturesAssigned == 0)
+            {
+                Debug.LogWarning($"  ⚠️ No textures assigned to {material.name}");
+            }
+            else
+            {
+                Debug.Log($"  ✓ Total: {texturesAssigned} textures assigned");
+            }
+
+            EditorUtility.SetDirty(material);
+
+            // Log AFTER state to verify changes were saved
+            Texture afterBaseMap = material.GetTexture("_BaseMap");
+            float afterWorkflow = material.HasProperty("_WorkflowMode") ? material.GetFloat("_WorkflowMode") : -1f;
+            Color afterColor = material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") : Color.black;
+
+            Debug.Log($"  AFTER - BaseMap: {(afterBaseMap != null ? afterBaseMap.name : "NULL")}");
+            Debug.Log($"  AFTER - WorkflowMode: {afterWorkflow} (0=Metallic, 1=Specular)");
+            Debug.Log($"  AFTER - BaseColor: {afterColor}");
+
+            if (afterBaseMap == null)
+            {
+                Debug.LogError($"  ❌ TEXTURE ASSIGNMENT FAILED! BaseMap is still NULL after assignment!");
+            }
+            if (afterWorkflow == 0f)
+            {
+                Debug.LogError($"  ❌ WORKFLOW CHANGE FAILED! Still in Metallic mode!");
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        Debug.Log("Materials saved and refreshed");
+
+        // Convert materials to URP using Unity's built-in converter
+        ConvertMaterialsToURP();
+
+        // Force reload materials on character instance in scene
+        ReloadCharacterMaterials();
+    }
+
+    private static void ConvertMaterialsToURP()
+    {
+        Debug.Log("Converting materials to URP...");
+
+        // Find all materials in Characters folder
+        string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { "Assets/Characters" });
+
+        foreach (string guid in materialGuids)
+        {
+            string materialPath = AssetDatabase.GUIDToAssetPath(guid);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+
+            if (material == null) continue;
+
+            // Check if material is using a built-in shader
+            string shaderName = material.shader.name;
+            if (shaderName.Contains("Standard") || shaderName.Contains("Legacy") || shaderName.Contains("Diffuse"))
+            {
+                Debug.Log($"  Converting {material.name} from {shaderName} to URP/Lit");
+
+                // Save current textures before conversion
+                Texture baseMap = material.GetTexture("_MainTex");
+                Texture normalMap = material.GetTexture("_BumpMap");
+                Texture specMap = material.GetTexture("_SpecGlossMap");
+                Color color = material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white;
+
+                // Switch to URP Lit shader
+                material.shader = Shader.Find("Universal Render Pipeline/Lit");
+
+                // Restore textures with URP property names
+                if (baseMap != null)
+                {
+                    material.SetTexture("_BaseMap", baseMap);
+                    material.SetTexture("_MainTex", baseMap);
+                }
+                if (normalMap != null)
+                {
+                    material.SetTexture("_BumpMap", normalMap);
+                    material.EnableKeyword("_NORMALMAP");
+                }
+                if (specMap != null)
+                {
+                    material.SetFloat("_WorkflowMode", 1f); // Specular workflow
+                    material.SetTexture("_SpecGlossMap", specMap);
+                }
+
+                material.SetColor("_BaseColor", color);
+                EditorUtility.SetDirty(material);
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log("URP conversion complete");
+    }
+
+    private static void ReloadCharacterMaterials()
+    {
+        // Find the Player and its CharacterModel child
+        GameObject player = GameObject.Find("Player");
+        if (player == null)
+        {
+            Debug.Log("No Player found to reload materials");
+            return;
+        }
+
+        Transform characterModel = player.transform.Find("CharacterModel");
+        if (characterModel == null)
+        {
+            Debug.Log("No CharacterModel found to reload materials");
+            return;
+        }
+
+        Debug.Log("Reloading materials on character renderers...");
+
+        // Get all renderers in the character
+        SkinnedMeshRenderer[] skinnedRenderers = characterModel.GetComponentsInChildren<SkinnedMeshRenderer>();
+        MeshRenderer[] meshRenderers = characterModel.GetComponentsInChildren<MeshRenderer>();
+
+        // Reload materials from Assets/Characters/Materials
+        string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { "Assets/Characters" });
+
+        foreach (SkinnedMeshRenderer renderer in skinnedRenderers)
+        {
+            Material[] newMaterials = new Material[renderer.sharedMaterials.Length];
+            for (int i = 0; i < renderer.sharedMaterials.Length; i++)
+            {
+                Material oldMat = renderer.sharedMaterials[i];
+                if (oldMat != null)
+                {
+                    // Find the extracted material with the same name
+                    foreach (string guid in materialGuids)
+                    {
+                        string matPath = AssetDatabase.GUIDToAssetPath(guid);
+                        Material extractedMat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                        if (extractedMat != null && extractedMat.name == oldMat.name)
+                        {
+                            newMaterials[i] = extractedMat;
+                            Debug.Log($"  ✓ Reloaded material: {extractedMat.name}");
+                            break;
+                        }
+                    }
+                }
+                if (newMaterials[i] == null)
+                {
+                    newMaterials[i] = oldMat; // Keep old if not found
+                }
+            }
+            renderer.sharedMaterials = newMaterials;
+        }
+
+        foreach (MeshRenderer renderer in meshRenderers)
+        {
+            Material[] newMaterials = new Material[renderer.sharedMaterials.Length];
+            for (int i = 0; i < renderer.sharedMaterials.Length; i++)
+            {
+                Material oldMat = renderer.sharedMaterials[i];
+                if (oldMat != null)
+                {
+                    foreach (string guid in materialGuids)
+                    {
+                        string matPath = AssetDatabase.GUIDToAssetPath(guid);
+                        Material extractedMat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                        if (extractedMat != null && extractedMat.name == oldMat.name)
+                        {
+                            newMaterials[i] = extractedMat;
+                            Debug.Log($"  ✓ Reloaded material: {extractedMat.name}");
+                            break;
+                        }
+                    }
+                }
+                if (newMaterials[i] == null)
+                {
+                    newMaterials[i] = oldMat;
+                }
+            }
+            renderer.sharedMaterials = newMaterials;
+        }
+
+        Debug.Log("Character materials reloaded from extracted assets");
+    }
+
+    private static void EnsureNormalMapSettings(string texturePath)
+    {
+        TextureImporter importer = AssetImporter.GetAtPath(texturePath) as TextureImporter;
+        if (importer != null && importer.textureType != TextureImporterType.NormalMap)
+        {
+            importer.textureType = TextureImporterType.NormalMap;
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
+            Debug.Log($"  Set {Path.GetFileName(texturePath)} as Normal Map");
+        }
+    }
+
+    private static void ExtractMaterialsFromModel(string modelPath)
+    {
+        // Import the model asset
+        ModelImporter modelImporter = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+
+        if (modelImporter == null) return;
+
+        // Get the directory of the model
+        string modelDirectory = Path.GetDirectoryName(modelPath);
+        string materialsFolder = Path.Combine(modelDirectory, "Materials");
+
+        // Check if materials folder already exists
+        if (AssetDatabase.IsValidFolder(materialsFolder))
+        {
+            Debug.Log("Materials already extracted for " + modelPath);
+            return; // Already extracted
+        }
+
+        Debug.Log("Extracting materials from " + modelPath);
+
+        // Create materials folder
+        if (!AssetDatabase.IsValidFolder(materialsFolder))
+        {
+            AssetDatabase.CreateFolder(modelDirectory, "Materials");
+        }
+
+        // Extract materials
+        try
+        {
+            // Load all sub-assets (materials)
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(modelPath);
+            int materialCount = 0;
+
+            foreach (Object asset in assets)
+            {
+                if (asset is Material)
+                {
+                    string materialPath = Path.Combine(materialsFolder, asset.name + ".mat");
+                    materialPath = materialPath.Replace("\\", "/");
+
+                    // Extract the material
+                    string error = AssetDatabase.ExtractAsset(asset, materialPath);
+                    if (string.IsNullOrEmpty(error))
+                    {
+                        AssetDatabase.WriteImportSettingsIfDirty(modelPath);
+                        AssetDatabase.ImportAsset(materialPath, ImportAssetOptions.ForceUpdate);
+                        materialCount++;
+                        Debug.Log($"Extracted material: {asset.name}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Failed to extract material {asset.name}: {error}");
+                    }
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            Debug.Log($"Extracted {materialCount} materials from {modelPath}");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"Could not extract materials from {modelPath}: {e.Message}");
+        }
     }
 }

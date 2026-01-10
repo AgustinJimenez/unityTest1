@@ -8,9 +8,10 @@ public class ThirdPersonCamera : MonoBehaviour
     [SerializeField] private Vector3 targetOffset = new Vector3(0, 1.5f, 0);
 
     [Header("Camera Settings")]
-    [SerializeField] private float distance = 5f;
-    [SerializeField] private float minDistance = 2f;
+    [SerializeField] private float distance = 1.25f;
+    [SerializeField] private float minDistance = 0.3f;
     [SerializeField] private float maxDistance = 10f;
+    [SerializeField] private float zoomSpeed = 15f;
 
     [Header("Rotation")]
     [SerializeField] private float mouseSensitivity = 32f;
@@ -66,8 +67,23 @@ public class ThirdPersonCamera : MonoBehaviour
     {
         if (target == null) return;
 
+        HandleZoom();
         HandleRotation();
         HandlePosition();
+    }
+
+    private void HandleZoom()
+    {
+        // Read mouse scroll wheel input
+        float scroll = UnityEngine.InputSystem.Mouse.current?.scroll.ReadValue().y ?? 0f;
+
+        if (scroll != 0f)
+        {
+            // Scroll up = zoom in (decrease distance), scroll down = zoom out (increase distance)
+            // Mouse scroll typically gives values around 120/-120, so normalize it
+            distance -= (scroll / 120f) * zoomSpeed;
+            distance = Mathf.Clamp(distance, minDistance, maxDistance);
+        }
     }
 
     private void HandleRotation()

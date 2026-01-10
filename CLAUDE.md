@@ -123,6 +123,58 @@ This project uses Universal Render Pipeline:
 - Post-processing effects use Volume components
 - URP-specific lighting and shadow settings apply
 
+## Importing Mixamo Characters with Textures
+
+### Common Issue: Dark or Missing Textures
+
+When importing Mixamo characters (especially DAE format) into Unity URP, textures often appear dark or missing. This was resolved through the following understanding:
+
+**Root Cause:**
+- Mixamo characters use **multiple texture sets** (e.g., Ch31_1001 for body, Ch31_1002 for hair)
+- All materials share the same prefix (e.g., "Ch31"), so naive texture searching finds ALL textures for ALL materials
+- If you assign textures without filtering, the LAST texture overwrites all previous ones
+- This causes wrong textures to be applied (e.g., dark hair texture on body material)
+
+**Texture Naming Convention (Mixamo):**
+- `Ch31_1001_Diffuse.png` - Body/skin texture (usually brighter)
+- `Ch31_1002_Diffuse.png` - Hair texture (usually darker)
+- `Ch31_1001_Normal.png` - Body normal map
+- `Ch31_1001_Specular.png` - Body specular map
+- Pattern: `{CharacterID}_{TextureSet}_{TextureType}.png`
+
+**Solution:**
+Match textures to materials intelligently based on material names:
+```csharp
+// Determine which texture set to use based on material name
+string preferredTextureNumber = "";
+if (materialName.ToLower().Contains("hair"))
+{
+    preferredTextureNumber = "1002"; // Hair textures
+}
+else if (materialName.ToLower().Contains("body"))
+{
+    preferredTextureNumber = "1001"; // Body textures
+}
+
+// Only assign textures that match the preferred set
+bool isPreferredTexture = string.IsNullOrEmpty(preferredTextureNumber)
+    || textureName.Contains(preferredTextureNumber);
+```
+
+**Key Points:**
+1. **DAE files are 100x too large** - Apply `transform.localScale = Vector3.one * 0.01f` for DAE imports
+2. **Materials use Specular workflow** - Set `material.SetFloat("_WorkflowMode", 1f)` for URP/Lit shader
+3. **Enable Specular keyword** - Call `material.EnableKeyword("_SPECULAR_SETUP")` to activate Specular rendering
+4. **One diffuse per material** - Only assign the FIRST matching diffuse texture to prevent overwriting
+5. **Normal maps must be configured** - Set texture import type to `TextureImporterType.NormalMap`
+
+**Lighting Requirements:**
+- Set ambient lighting: `RenderSettings.ambientMode = AmbientMode.Flat` with bright color
+- Increase directional light intensity to 2-3 for better visibility
+- Mixamo characters can appear dark without proper ambient lighting
+
+See `Assets/Scripts/Editor/ThirdPersonSetup.cs` for the complete implementation of automated Mixamo character setup.
+
 ## Editor Scripts
 
 Scripts in `Editor/` folders run in the Unity Editor, not in builds:
