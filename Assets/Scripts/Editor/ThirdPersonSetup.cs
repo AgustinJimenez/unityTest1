@@ -262,10 +262,11 @@ public class ThirdPersonSetup : EditorWindow
             Undo.DestroyObjectImmediate(meshFilter);
         }
 
-        // Check if it's a DAE file and extract materials if needed
+        // Check if it's a DAE file and configure import settings
         string prefabPath = AssetDatabase.GetAssetPath(characterPrefab);
         if (prefabPath.EndsWith(".dae"))
         {
+            ConfigureCharacterModel(prefabPath);
             ExtractMaterialsFromModel(prefabPath);
         }
 
@@ -274,16 +275,7 @@ public class ThirdPersonSetup : EditorWindow
         characterInstance.name = "CharacterModel";
         characterInstance.transform.localPosition = Vector3.zero;
         characterInstance.transform.localRotation = Quaternion.identity;
-
-        // DAE files from Mixamo are often 100x too big, scale them down
-        if (prefabPath.EndsWith(".dae"))
-        {
-            characterInstance.transform.localScale = Vector3.one * 0.01f; // Scale down 100x
-        }
-        else
-        {
-            characterInstance.transform.localScale = Vector3.one;
-        }
+        characterInstance.transform.localScale = Vector3.one; // No runtime scaling needed - scale is set in importer
 
         Undo.RegisterCreatedObjectUndo(characterInstance, "Add Character Model");
 
@@ -321,13 +313,24 @@ public class ThirdPersonSetup : EditorWindow
             }
         }
 
-        // Add Animator
+        // Add Animator and setup controller
         Animator animator = characterInstance.GetComponent<Animator>();
         if (animator == null)
         {
             animator = characterInstance.AddComponent<Animator>();
             Undo.RegisterCreatedObjectUndo(animator, "Add Animator");
         }
+
+        // Setup avatar (required for humanoid animations)
+        SetupAvatar(animator, prefabPath);
+
+        // Setup animation controller
+        SetupAnimatorController(animator, prefabPath);
+
+        // CRITICAL: Disable root motion AFTER controller is assigned (prevents character from moving with animation)
+        // Must be done after controller assignment or it gets reset
+        animator.applyRootMotion = false;
+        Debug.Log("Disabled Apply Root Motion on Animator");
 
         return true;
     }
@@ -880,6 +883,337 @@ public class ThirdPersonSetup : EditorWindow
             AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
             Debug.Log($"  Set {Path.GetFileName(texturePath)} as Normal Map");
         }
+    }
+
+    private static void ConfigureCharacterModel(string modelPath)
+    {
+        if (!modelPath.EndsWith(".dae") && !modelPath.EndsWith(".fbx")) return;
+
+        Debug.Log($"Configuring character model at {modelPath}");
+
+        ModelImporter modelImporter = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+
+        if (modelImporter != null)
+        {
+            bool needsReimport = false;
+
+            // Set scale to 0.01 for Mixamo DAE files (they're 100x too large)
+            if (modelPath.EndsWith(".dae") && modelImporter.globalScale != 0.01f)
+            {
+                modelImporter.globalScale = 0.01f;
+                needsReimport = true;
+                Debug.Log("Set character model scale to 0.01");
+            }
+
+            // Set to humanoid animation type with "Create From This Model"
+            if (modelImporter.animationType != ModelImporterAnimationType.Human)
+            {
+                modelImporter.animationType = ModelImporterAnimationType.Human;
+                needsReimport = true;
+                Debug.Log("Set character model to Humanoid animation type");
+            }
+
+            // CRITICAL: Create avatar from this model (not copy from other)
+            if (modelImporter.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+            {
+                modelImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                needsReimport = true;
+                Debug.Log("Set avatar to 'Create From This Model'");
+            }
+
+            // CRITICAL: Enforce T-Pose to fix "hanging crouch" issue
+            HumanDescription humanDesc = modelImporter.humanDescription;
+            humanDesc.hasTranslationDoF = false;
+            modelImporter.humanDescription = humanDesc;
+            Debug.Log("Configured human description to prevent hanging crouch");
+            needsReimport = true;
+
+            if (needsReimport)
+            {
+                modelImporter.SaveAndReimport();
+                Debug.Log("Character model configured: scale=0.01, humanoid avatar with T-pose enforcement");
+            }
+        }
+    }
+
+    private static void ConfigureIdleAnimation(string characterDir)
+    {
+        // Find the character model path to use as avatar source
+        string characterModelPath = null;
+        string[] characterFiles = AssetDatabase.FindAssets("leonard", new[] { characterDir });
+
+        foreach (string guid in characterFiles)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if ((path.EndsWith(".dae") || path.EndsWith(".fbx")) && !path.Contains("Idle"))
+            {
+                characterModelPath = path;
+                break;
+            }
+        }
+
+        // Find the Idle.dae file
+        string[] idleFiles = AssetDatabase.FindAssets("Idle", new[] { characterDir });
+
+        foreach (string guid in idleFiles)
+        {
+            string idlePath = AssetDatabase.GUIDToAssetPath(guid);
+
+            if (idlePath.EndsWith(".dae") || idlePath.EndsWith(".fbx"))
+            {
+                Debug.Log($"Configuring idle animation at {idlePath}");
+
+                ModelImporter idleImporter = AssetImporter.GetAtPath(idlePath) as ModelImporter;
+
+                if (idleImporter != null)
+                {
+                    bool needsReimport = false;
+
+                    // CRITICAL: Set animation type to humanoid
+                    if (idleImporter.animationType != ModelImporterAnimationType.Human)
+                    {
+                        idleImporter.animationType = ModelImporterAnimationType.Human;
+                        needsReimport = true;
+                        Debug.Log("Set idle file to Humanoid animation type");
+                    }
+
+                    // CRITICAL: Copy avatar from character model (must use same avatar to avoid pose mismatch)
+                    if (characterModelPath != null)
+                    {
+                        // First ensure character model is imported and avatar is created
+                        AssetDatabase.ImportAsset(characterModelPath, ImportAssetOptions.ForceUpdate);
+
+                        // Load all assets from the character model file
+                        UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(characterModelPath);
+                        Avatar characterAvatar = null;
+
+                        foreach (var asset in allAssets)
+                        {
+                            if (asset is Avatar)
+                            {
+                                characterAvatar = asset as Avatar;
+                                Debug.Log($"Found avatar: {characterAvatar.name}");
+                                break;
+                            }
+                        }
+
+                        if (characterAvatar != null && idleImporter.avatarSetup != ModelImporterAvatarSetup.CopyFromOther)
+                        {
+                            idleImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+                            idleImporter.sourceAvatar = characterAvatar;
+                            needsReimport = true;
+                            Debug.Log($"Set idle animation to copy avatar from {characterAvatar.name}");
+                        }
+                        else if (characterAvatar == null)
+                        {
+                            Debug.LogWarning("Could not find avatar in character model - animation may not work correctly");
+                        }
+                    }
+
+                    // CRITICAL: Set scale to 0.01 to match Mixamo DAE scale
+                    if (idlePath.EndsWith(".dae") && idleImporter.globalScale != 0.01f)
+                    {
+                        idleImporter.globalScale = 0.01f;
+                        needsReimport = true;
+                        Debug.Log("Set idle animation scale to 0.01");
+                    }
+
+                    // CRITICAL: Don't import mesh or materials, only animation
+                    if (idleImporter.importBlendShapes)
+                    {
+                        idleImporter.importBlendShapes = false;
+                        needsReimport = true;
+                    }
+                    if (idleImporter.importVisibility)
+                    {
+                        idleImporter.importVisibility = false;
+                        needsReimport = true;
+                    }
+                    if (idleImporter.importCameras)
+                    {
+                        idleImporter.importCameras = false;
+                        needsReimport = true;
+                    }
+                    if (idleImporter.importLights)
+                    {
+                        idleImporter.importLights = false;
+                        needsReimport = true;
+                    }
+                    // Don't import materials from animation files
+                    if (idleImporter.materialImportMode != ModelImporterMaterialImportMode.None)
+                    {
+                        idleImporter.materialImportMode = ModelImporterMaterialImportMode.None;
+                        needsReimport = true;
+                        Debug.Log("Disabled material import for animation file");
+                    }
+
+                    // Import animation
+                    if (!idleImporter.importAnimation)
+                    {
+                        idleImporter.importAnimation = true;
+                        needsReimport = true;
+                        Debug.Log("Enabled animation import");
+                    }
+
+                    // Configure animation clips to loop and lock root motion
+                    ModelImporterClipAnimation[] clipAnimations = idleImporter.defaultClipAnimations;
+                    if (clipAnimations.Length > 0)
+                    {
+                        for (int i = 0; i < clipAnimations.Length; i++)
+                        {
+                            clipAnimations[i].loopTime = true;
+                            clipAnimations[i].lockRootRotation = true;
+                            clipAnimations[i].lockRootHeightY = true;
+                            clipAnimations[i].lockRootPositionXZ = true;
+                            clipAnimations[i].keepOriginalPositionY = false;
+                            clipAnimations[i].keepOriginalPositionXZ = false;
+
+                            // CRITICAL: Use feet as base for vertical position (not center of mass)
+                            // This prevents character from sinking into ground
+                            clipAnimations[i].heightFromFeet = true;
+                        }
+                        idleImporter.clipAnimations = clipAnimations;
+                        needsReimport = true;
+                    }
+
+                    if (needsReimport)
+                    {
+                        idleImporter.SaveAndReimport();
+                        Debug.Log("Configured idle animation: scale=0.01, loop enabled, root motion locked, avatar matched");
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    private static void SetupAvatar(Animator animator, string characterPath)
+    {
+        Debug.Log("=== SETTING UP AVATAR ===");
+
+        // Configure the character model to generate a humanoid avatar
+        ModelImporter modelImporter = AssetImporter.GetAtPath(characterPath) as ModelImporter;
+
+        if (modelImporter != null)
+        {
+            bool needsReimport = false;
+
+            // Set to humanoid animation type
+            if (modelImporter.animationType != ModelImporterAnimationType.Human)
+            {
+                modelImporter.animationType = ModelImporterAnimationType.Human;
+                needsReimport = true;
+                Debug.Log("Set model to Humanoid animation type");
+            }
+
+            // Save and reimport if needed
+            if (needsReimport)
+            {
+                modelImporter.SaveAndReimport();
+                Debug.Log("Reimported model with Humanoid settings");
+            }
+
+            // Load the avatar from the model
+            Avatar avatar = AssetDatabase.LoadAssetAtPath<Avatar>(characterPath);
+
+            if (avatar != null)
+            {
+                animator.avatar = avatar;
+                Debug.Log($"Assigned avatar: {avatar.name}");
+            }
+            else
+            {
+                Debug.LogWarning("Could not load avatar from model");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("Could not access model importer for avatar setup");
+        }
+    }
+
+    private static void SetupAnimatorController(Animator animator, string characterPath)
+    {
+        Debug.Log("=== SETTING UP ANIMATOR CONTROLLER ===");
+
+        // Get the character directory
+        string characterDir = Path.GetDirectoryName(characterPath);
+
+        // Check if an animator controller already exists
+        string controllerPath = Path.Combine(characterDir, "CharacterAnimator.controller").Replace("\\", "/");
+        UnityEditor.Animations.AnimatorController controller = AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(controllerPath);
+
+        if (controller == null)
+        {
+            // Create new animator controller
+            controller = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+            Debug.Log($"Created animator controller at {controllerPath}");
+        }
+        else
+        {
+            Debug.Log($"Using existing animator controller at {controllerPath}");
+        }
+
+        // First, configure the Idle animation file
+        ConfigureIdleAnimation(characterDir);
+
+        // Look for animation clips in the Idle subdirectory
+        string idleDir = Path.Combine(characterDir, "Idle").Replace("\\", "/");
+        string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { idleDir });
+
+        if (animGuids.Length > 0)
+        {
+            string animPath = AssetDatabase.GUIDToAssetPath(animGuids[0]);
+            AnimationClip idleClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(animPath);
+
+            if (idleClip != null)
+            {
+                Debug.Log($"Found idle animation: {idleClip.name}");
+
+                // Check if the state already exists
+                var stateMachine = controller.layers[0].stateMachine;
+                bool stateExists = false;
+
+                foreach (var state in stateMachine.states)
+                {
+                    if (state.state.name == "Idle")
+                    {
+                        state.state.motion = idleClip;
+                        stateExists = true;
+                        Debug.Log("Updated existing Idle state");
+                        break;
+                    }
+                }
+
+                if (!stateExists)
+                {
+                    // Create idle state
+                    var idleState = stateMachine.AddState("Idle");
+                    idleState.motion = idleClip;
+
+                    // Set as default state
+                    stateMachine.defaultState = idleState;
+
+                    Debug.Log("Created Idle state and set as default");
+                }
+
+                EditorUtility.SetDirty(controller);
+                AssetDatabase.SaveAssets();
+            }
+            else
+            {
+                Debug.LogWarning("Could not load idle animation clip");
+            }
+        }
+        else
+        {
+            Debug.Log("No idle animation found - controller created without animations");
+        }
+
+        // Assign controller to animator
+        animator.runtimeAnimatorController = controller;
+        Debug.Log("Assigned animator controller to character");
     }
 
     private static void ExtractMaterialsFromModel(string modelPath)
