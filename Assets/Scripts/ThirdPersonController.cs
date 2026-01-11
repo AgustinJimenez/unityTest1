@@ -46,6 +46,7 @@ public class ThirdPersonController : MonoBehaviour
             jumpAction = playerInput.actions["Jump"];
             sprintAction = playerInput.actions["Sprint"];
         }
+
     }
 
     private void OnEnable()
@@ -127,12 +128,28 @@ public class ThirdPersonController : MonoBehaviour
         Vector3 move = desiredMoveDirection.normalized * currentSpeed;
         controller.Move(move * Time.deltaTime);
 
-        // Update animator speed parameter
+        // Update animator parameters
         if (animator != null)
         {
             // Normalize speed to 0-1 range based on walk speed
             float normalizedSpeed = currentSpeed / walkSpeed;
             animator.SetFloat("Speed", normalizedSpeed);
+
+            // Set sprint state (if parameter exists)
+            if (HasParameter(animator, "IsSprinting"))
+            {
+                animator.SetBool("IsSprinting", isSprinting);
+            }
+
+            // Set directional blend tree parameters (for 8-directional sprint)
+            if (HasParameter(animator, "Horizontal"))
+            {
+                animator.SetFloat("Horizontal", moveInput.x);
+            }
+            if (HasParameter(animator, "Vertical"))
+            {
+                animator.SetFloat("Vertical", moveInput.y);
+            }
         }
     }
 
@@ -158,5 +175,17 @@ public class ThirdPersonController : MonoBehaviour
             Gizmos.color = isGrounded ? Color.green : Color.red;
             Gizmos.DrawWireSphere(spherePosition, controller.radius + groundCheckDistance);
         }
+    }
+
+    private bool HasParameter(Animator animator, string paramName)
+    {
+        foreach (AnimatorControllerParameter param in animator.parameters)
+        {
+            if (param.name == paramName)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }
