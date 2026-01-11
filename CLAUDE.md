@@ -248,10 +248,10 @@ ModelImporterClipAnimation clip = idleImporter.defaultClipAnimations[0];
 // Loop the animation
 clip.loopTime = true;
 
-// Lock root motion (prevent animation from moving character)
+// Lock root motion (prevent animation from controlling character)
 clip.lockRootRotation = true;
 clip.lockRootHeightY = true;
-clip.lockRootPositionXZ = true;
+clip.lockRootPositionXZ = false;  // CRITICAL: false for scripted movement!
 
 // Don't use animation's baked position data
 clip.keepOriginalPositionY = false;
@@ -261,6 +261,20 @@ clip.keepOriginalPositionXZ = false;
 // This prevents character from sinking into ground
 clip.heightFromFeet = true;
 ```
+
+**Why `lockRootPositionXZ = false` is critical:**
+- When `true`: Locks the root position, preventing Unity from baking the animation's XZ movement into the pose
+- When `false`: Allows Unity to **bake the XZ movement into the pose**, which is what you want for scripted movement
+- For scripted movement (using CharacterController), you want the animation's forward/side movement baked into the character's bone poses, NOT moving the root transform
+- **Symptom if set to `true`:** Character drifts away from its actual position during movement animations (like walking), then reappears at the correct position - creates a "teleporting loop" effect
+
+**In Unity Inspector, verify:**
+- Select the animation file (e.g., Walking.dae)
+- Click on the "Animations" tab
+- Expand the animation clip (e.g., "Take 001")
+- Scroll to **"Root Transform Position (XZ)"**
+- **"Bake Into Pose"** should be **checked** (green indicator)
+- If it shows a red indicator, the position is not being baked and will cause drift
 
 **Why `heightFromFeet = true` is critical:**
 - Mixamo animations default to "Based Upon: Center of Mass" for Root Transform Position (Y)
@@ -306,17 +320,63 @@ AnimationClip clip = allAssets.OfType<AnimationClip>().FirstOrDefault();
 
 Mixamo animations are typically named "Take 001" by default, not by the animation name.
 
+### Multiple Animations and State Machines
+
+When setting up multiple animations (Idle, Walk, Run, Jump, etc.):
+
+**Animator Controller Setup:**
+1. Create an Animator Controller asset
+2. Add parameters for animation control (e.g., "Speed" as Float)
+3. Create animation states for each animation clip
+4. Set up transitions between states with conditions
+
+**Example: Idle ↔ Walk Transition:**
+```csharp
+// Add Speed parameter
+controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
+
+// Create states
+var idleState = stateMachine.AddState("Idle");
+idleState.motion = idleClip;
+
+var walkState = stateMachine.AddState("Walk");
+walkState.motion = walkClip;
+
+// Idle → Walk transition (when moving)
+var idleToWalk = idleState.AddTransition(walkState);
+idleToWalk.AddCondition(AnimatorConditionMode.Greater, 0.1f, "Speed");
+idleToWalk.hasExitTime = false;
+idleToWalk.duration = 0.25f;
+
+// Walk → Idle transition (when stopped)
+var walkToIdle = walkState.AddTransition(idleState);
+walkToIdle.AddCondition(AnimatorConditionMode.Less, 0.1f, "Speed");
+walkToIdle.hasExitTime = false;
+walkToIdle.duration = 0.25f;
+```
+
+**In Movement Script:**
+```csharp
+// Get animator reference
+animator = GetComponentInChildren<Animator>();
+
+// Update in movement code
+float normalizedSpeed = currentSpeed / walkSpeed;
+animator.SetFloat("Speed", normalizedSpeed);
+```
+
 ### Complete Automated Setup
 
 The `ThirdPersonSetup.cs` script automates all of this:
 1. Configures character model with correct scale and avatar
 2. Finds and configures animation files in subdirectories
 3. Sets up avatar copying for animation retargeting
-4. Configures animation clips with proper root transform settings
-5. Creates Animator Controller and adds animation states
-6. Assigns controller and disables Apply Root Motion
+4. Configures animation clips with proper root transform settings (including `lockRootPositionXZ = false`)
+5. Creates Animator Controller with parameters and animation states
+6. Sets up state transitions based on movement parameters
+7. Assigns controller and disables Apply Root Motion
 
-See `Assets/Scripts/Editor/ThirdPersonSetup.cs` → `ConfigureIdleAnimation()` and `SetupAnimatorController()` for the complete implementation.
+See `Assets/Scripts/Editor/ThirdPersonSetup.cs` → `ConfigureAnimation()`, `ConfigureAnimationFile()`, and `SetupAnimatorController()` for the complete implementation.
 
 ## Editor Scripts
 
