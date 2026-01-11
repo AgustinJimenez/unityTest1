@@ -23,6 +23,7 @@ public class ThirdPersonController : MonoBehaviour
     private bool isGrounded;
     private float currentSpeed;
     private Transform cameraTransform;
+    private Animator animator;
 
     // Direct Input Action references
     private InputAction moveAction;
@@ -33,6 +34,9 @@ public class ThirdPersonController : MonoBehaviour
     {
         controller = GetComponent<CharacterController>();
         cameraTransform = Camera.main.transform;
+
+        // Get animator from character model child
+        animator = GetComponentInChildren<Animator>();
 
         // Get the Input Actions directly
         var playerInput = GetComponent<PlayerInput>();
@@ -64,6 +68,12 @@ public class ThirdPersonController : MonoBehaviour
         HandleMovement();
         HandleGravity();
         HandleJump();
+
+        // CRITICAL: Ensure Apply Root Motion stays disabled
+        if (animator != null && animator.applyRootMotion)
+        {
+            animator.applyRootMotion = false;
+        }
     }
 
     private void CheckGround()
@@ -116,6 +126,14 @@ public class ThirdPersonController : MonoBehaviour
         // Apply movement
         Vector3 move = desiredMoveDirection.normalized * currentSpeed;
         controller.Move(move * Time.deltaTime);
+
+        // Update animator speed parameter
+        if (animator != null)
+        {
+            // Normalize speed to 0-1 range based on walk speed
+            float normalizedSpeed = currentSpeed / walkSpeed;
+            animator.SetFloat("Speed", normalizedSpeed);
+        }
     }
 
     private void HandleGravity()

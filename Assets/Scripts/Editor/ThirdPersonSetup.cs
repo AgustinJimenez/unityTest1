@@ -936,158 +936,6 @@ public class ThirdPersonSetup : EditorWindow
         }
     }
 
-    private static void ConfigureIdleAnimation(string characterDir)
-    {
-        // Find the character model path to use as avatar source
-        string characterModelPath = null;
-        string[] characterFiles = AssetDatabase.FindAssets("leonard", new[] { characterDir });
-
-        foreach (string guid in characterFiles)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            if ((path.EndsWith(".dae") || path.EndsWith(".fbx")) && !path.Contains("Idle"))
-            {
-                characterModelPath = path;
-                break;
-            }
-        }
-
-        // Find the Idle.dae file
-        string[] idleFiles = AssetDatabase.FindAssets("Idle", new[] { characterDir });
-
-        foreach (string guid in idleFiles)
-        {
-            string idlePath = AssetDatabase.GUIDToAssetPath(guid);
-
-            if (idlePath.EndsWith(".dae") || idlePath.EndsWith(".fbx"))
-            {
-                Debug.Log($"Configuring idle animation at {idlePath}");
-
-                ModelImporter idleImporter = AssetImporter.GetAtPath(idlePath) as ModelImporter;
-
-                if (idleImporter != null)
-                {
-                    bool needsReimport = false;
-
-                    // CRITICAL: Set animation type to humanoid
-                    if (idleImporter.animationType != ModelImporterAnimationType.Human)
-                    {
-                        idleImporter.animationType = ModelImporterAnimationType.Human;
-                        needsReimport = true;
-                        Debug.Log("Set idle file to Humanoid animation type");
-                    }
-
-                    // CRITICAL: Copy avatar from character model (must use same avatar to avoid pose mismatch)
-                    if (characterModelPath != null)
-                    {
-                        // First ensure character model is imported and avatar is created
-                        AssetDatabase.ImportAsset(characterModelPath, ImportAssetOptions.ForceUpdate);
-
-                        // Load all assets from the character model file
-                        UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(characterModelPath);
-                        Avatar characterAvatar = null;
-
-                        foreach (var asset in allAssets)
-                        {
-                            if (asset is Avatar)
-                            {
-                                characterAvatar = asset as Avatar;
-                                Debug.Log($"Found avatar: {characterAvatar.name}");
-                                break;
-                            }
-                        }
-
-                        if (characterAvatar != null && idleImporter.avatarSetup != ModelImporterAvatarSetup.CopyFromOther)
-                        {
-                            idleImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
-                            idleImporter.sourceAvatar = characterAvatar;
-                            needsReimport = true;
-                            Debug.Log($"Set idle animation to copy avatar from {characterAvatar.name}");
-                        }
-                        else if (characterAvatar == null)
-                        {
-                            Debug.LogWarning("Could not find avatar in character model - animation may not work correctly");
-                        }
-                    }
-
-                    // CRITICAL: Set scale to 0.01 to match Mixamo DAE scale
-                    if (idlePath.EndsWith(".dae") && idleImporter.globalScale != 0.01f)
-                    {
-                        idleImporter.globalScale = 0.01f;
-                        needsReimport = true;
-                        Debug.Log("Set idle animation scale to 0.01");
-                    }
-
-                    // CRITICAL: Don't import mesh or materials, only animation
-                    if (idleImporter.importBlendShapes)
-                    {
-                        idleImporter.importBlendShapes = false;
-                        needsReimport = true;
-                    }
-                    if (idleImporter.importVisibility)
-                    {
-                        idleImporter.importVisibility = false;
-                        needsReimport = true;
-                    }
-                    if (idleImporter.importCameras)
-                    {
-                        idleImporter.importCameras = false;
-                        needsReimport = true;
-                    }
-                    if (idleImporter.importLights)
-                    {
-                        idleImporter.importLights = false;
-                        needsReimport = true;
-                    }
-                    // Don't import materials from animation files
-                    if (idleImporter.materialImportMode != ModelImporterMaterialImportMode.None)
-                    {
-                        idleImporter.materialImportMode = ModelImporterMaterialImportMode.None;
-                        needsReimport = true;
-                        Debug.Log("Disabled material import for animation file");
-                    }
-
-                    // Import animation
-                    if (!idleImporter.importAnimation)
-                    {
-                        idleImporter.importAnimation = true;
-                        needsReimport = true;
-                        Debug.Log("Enabled animation import");
-                    }
-
-                    // Configure animation clips to loop and lock root motion
-                    ModelImporterClipAnimation[] clipAnimations = idleImporter.defaultClipAnimations;
-                    if (clipAnimations.Length > 0)
-                    {
-                        for (int i = 0; i < clipAnimations.Length; i++)
-                        {
-                            clipAnimations[i].loopTime = true;
-                            clipAnimations[i].lockRootRotation = true;
-                            clipAnimations[i].lockRootHeightY = true;
-                            clipAnimations[i].lockRootPositionXZ = true;
-                            clipAnimations[i].keepOriginalPositionY = false;
-                            clipAnimations[i].keepOriginalPositionXZ = false;
-
-                            // CRITICAL: Use feet as base for vertical position (not center of mass)
-                            // This prevents character from sinking into ground
-                            clipAnimations[i].heightFromFeet = true;
-                        }
-                        idleImporter.clipAnimations = clipAnimations;
-                        needsReimport = true;
-                    }
-
-                    if (needsReimport)
-                    {
-                        idleImporter.SaveAndReimport();
-                        Debug.Log("Configured idle animation: scale=0.01, loop enabled, root motion locked, avatar matched");
-                    }
-                }
-
-                break;
-            }
-        }
-    }
-
     private static void SetupAvatar(Animator animator, string characterPath)
     {
         Debug.Log("=== SETTING UP AVATAR ===");
@@ -1155,65 +1003,282 @@ public class ThirdPersonSetup : EditorWindow
             Debug.Log($"Using existing animator controller at {controllerPath}");
         }
 
-        // First, configure the Idle animation file
-        ConfigureIdleAnimation(characterDir);
+        // Configure all animations in subdirectories
+        ConfigureAnimation(characterDir, "Idle");
+        ConfigureAnimation(characterDir, "Animations/Walking");
 
-        // Look for animation clips in the Idle subdirectory
-        string idleDir = Path.Combine(characterDir, "Idle").Replace("\\", "/");
-        string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { idleDir });
+        // Find and add all animation clips
+        var stateMachine = controller.layers[0].stateMachine;
 
-        if (animGuids.Length > 0)
+        // Dictionary to store found animation clips
+        System.Collections.Generic.Dictionary<string, AnimationClip> animations = new System.Collections.Generic.Dictionary<string, AnimationClip>();
+
+        // Search in multiple locations
+        string[] searchDirs = new string[]
         {
-            string animPath = AssetDatabase.GUIDToAssetPath(animGuids[0]);
-            AnimationClip idleClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(animPath);
+            Path.Combine(characterDir, "Idle").Replace("\\", "/"),
+            Path.Combine(characterDir, "Animations").Replace("\\", "/")
+        };
 
-            if (idleClip != null)
+        foreach (string searchDir in searchDirs)
+        {
+            if (AssetDatabase.IsValidFolder(searchDir))
             {
-                Debug.Log($"Found idle animation: {idleClip.name}");
+                string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { searchDir });
 
-                // Check if the state already exists
-                var stateMachine = controller.layers[0].stateMachine;
-                bool stateExists = false;
-
-                foreach (var state in stateMachine.states)
+                foreach (string guid in animGuids)
                 {
-                    if (state.state.name == "Idle")
+                    string animPath = AssetDatabase.GUIDToAssetPath(guid);
+                    AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(animPath);
+
+                    if (clip != null)
                     {
-                        state.state.motion = idleClip;
-                        stateExists = true;
-                        Debug.Log("Updated existing Idle state");
-                        break;
+                        string fileName = Path.GetFileNameWithoutExtension(Path.GetDirectoryName(animPath));
+                        if (fileName == "Idle" || fileName == "Animations")
+                        {
+                            fileName = Path.GetFileNameWithoutExtension(animPath);
+                        }
+
+                        // Determine animation name based on file location
+                        string animName = fileName;
+                        if (animPath.Contains("Idle"))
+                            animName = "Idle";
+                        else if (animPath.Contains("Walking"))
+                            animName = "Walk";
+
+                        if (!animations.ContainsKey(animName))
+                        {
+                            animations[animName] = clip;
+                            Debug.Log($"Found {animName} animation: {clip.name}");
+                        }
                     }
                 }
-
-                if (!stateExists)
-                {
-                    // Create idle state
-                    var idleState = stateMachine.AddState("Idle");
-                    idleState.motion = idleClip;
-
-                    // Set as default state
-                    stateMachine.defaultState = idleState;
-
-                    Debug.Log("Created Idle state and set as default");
-                }
-
-                EditorUtility.SetDirty(controller);
-                AssetDatabase.SaveAssets();
-            }
-            else
-            {
-                Debug.LogWarning("Could not load idle animation clip");
             }
         }
-        else
+
+        // Add Speed parameter for movement
+        if (controller.parameters.Length == 0 || System.Array.Find(controller.parameters, p => p.name == "Speed") == null)
         {
-            Debug.Log("No idle animation found - controller created without animations");
+            controller.AddParameter("Speed", UnityEngine.AnimatorControllerParameterType.Float);
+            Debug.Log("Added Speed parameter");
         }
+
+        // Create or update animation states
+        UnityEditor.Animations.AnimatorState idleState = null;
+        UnityEditor.Animations.AnimatorState walkState = null;
+
+        // Create Idle state
+        if (animations.ContainsKey("Idle"))
+        {
+            idleState = GetOrCreateState(stateMachine, "Idle", animations["Idle"]);
+            stateMachine.defaultState = idleState;
+        }
+
+        // Create Walk state
+        if (animations.ContainsKey("Walk"))
+        {
+            walkState = GetOrCreateState(stateMachine, "Walk", animations["Walk"]);
+        }
+
+        // Setup transitions if both states exist
+        if (idleState != null && walkState != null)
+        {
+            // Idle to Walk transition
+            bool hasIdleToWalk = false;
+            foreach (var transition in idleState.transitions)
+            {
+                if (transition.destinationState == walkState)
+                {
+                    hasIdleToWalk = true;
+                    break;
+                }
+            }
+
+            if (!hasIdleToWalk)
+            {
+                var idleToWalk = idleState.AddTransition(walkState);
+                idleToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, 0.1f, "Speed");
+                idleToWalk.hasExitTime = false;
+                idleToWalk.duration = 0.25f;
+                Debug.Log("Created Idle -> Walk transition");
+            }
+
+            // Walk to Idle transition
+            bool hasWalkToIdle = false;
+            foreach (var transition in walkState.transitions)
+            {
+                if (transition.destinationState == idleState)
+                {
+                    hasWalkToIdle = true;
+                    break;
+                }
+            }
+
+            if (!hasWalkToIdle)
+            {
+                var walkToIdle = walkState.AddTransition(idleState);
+                walkToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, 0.1f, "Speed");
+                walkToIdle.hasExitTime = false;
+                walkToIdle.duration = 0.25f;
+                Debug.Log("Created Walk -> Idle transition");
+            }
+        }
+
+        EditorUtility.SetDirty(controller);
+        AssetDatabase.SaveAssets();
 
         // Assign controller to animator
         animator.runtimeAnimatorController = controller;
         Debug.Log("Assigned animator controller to character");
+    }
+
+    private static UnityEditor.Animations.AnimatorState GetOrCreateState(UnityEditor.Animations.AnimatorStateMachine stateMachine, string stateName, AnimationClip clip)
+    {
+        // Check if state already exists
+        foreach (var childState in stateMachine.states)
+        {
+            if (childState.state.name == stateName)
+            {
+                childState.state.motion = clip;
+                Debug.Log($"Updated existing {stateName} state");
+                return childState.state;
+            }
+        }
+
+        // Create new state
+        var newState = stateMachine.AddState(stateName);
+        newState.motion = clip;
+        Debug.Log($"Created {stateName} state");
+        return newState;
+    }
+
+    private static void ConfigureAnimation(string characterDir, string animPath)
+    {
+        string fullPath = Path.Combine(characterDir, animPath).Replace("\\", "/");
+
+        // Check if it's a directory or file path
+        if (AssetDatabase.IsValidFolder(fullPath))
+        {
+            // It's a directory, find animation files inside
+            string[] files = AssetDatabase.FindAssets("t:Model", new[] { fullPath });
+            foreach (string guid in files)
+            {
+                string filePath = AssetDatabase.GUIDToAssetPath(guid);
+                if (filePath.EndsWith(".dae") || filePath.EndsWith(".fbx"))
+                {
+                    ConfigureAnimationFile(filePath, characterDir);
+                }
+            }
+        }
+        else
+        {
+            // Try as a file pattern
+            string dir = Path.GetDirectoryName(fullPath).Replace("\\", "/");
+            if (AssetDatabase.IsValidFolder(dir))
+            {
+                string[] files = AssetDatabase.FindAssets("t:Model", new[] { dir });
+                foreach (string guid in files)
+                {
+                    string filePath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (filePath.EndsWith(".dae") || filePath.EndsWith(".fbx"))
+                    {
+                        ConfigureAnimationFile(filePath, characterDir);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void ConfigureAnimationFile(string animFilePath, string characterDir)
+    {
+        Debug.Log($"Configuring animation file: {animFilePath}");
+
+        ModelImporter animImporter = AssetImporter.GetAtPath(animFilePath) as ModelImporter;
+        if (animImporter == null) return;
+
+        bool needsReimport = false;
+
+        // Find character model for avatar
+        string[] characterFiles = AssetDatabase.FindAssets("leonard", new[] { characterDir });
+        string characterModelPath = null;
+        foreach (string guid in characterFiles)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if ((path.EndsWith(".dae") || path.EndsWith(".fbx")) && !path.Contains("Idle") && !path.Contains("Walking") && !path.Contains("Animations"))
+            {
+                characterModelPath = path;
+                break;
+            }
+        }
+
+        // Configure animation type
+        if (animImporter.animationType != ModelImporterAnimationType.Human)
+        {
+            animImporter.animationType = ModelImporterAnimationType.Human;
+            needsReimport = true;
+        }
+
+        // Copy avatar from character model
+        if (characterModelPath != null)
+        {
+            AssetDatabase.ImportAsset(characterModelPath, ImportAssetOptions.ForceUpdate);
+            UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(characterModelPath);
+            Avatar characterAvatar = null;
+
+            foreach (var asset in allAssets)
+            {
+                if (asset is Avatar)
+                {
+                    characterAvatar = asset as Avatar;
+                    break;
+                }
+            }
+
+            if (characterAvatar != null && animImporter.avatarSetup != ModelImporterAvatarSetup.CopyFromOther)
+            {
+                animImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+                animImporter.sourceAvatar = characterAvatar;
+                needsReimport = true;
+            }
+        }
+
+        // Set scale for DAE files
+        if (animFilePath.EndsWith(".dae") && animImporter.globalScale != 0.01f)
+        {
+            animImporter.globalScale = 0.01f;
+            needsReimport = true;
+        }
+
+        // Don't import materials from animation files
+        if (animImporter.materialImportMode != ModelImporterMaterialImportMode.None)
+        {
+            animImporter.materialImportMode = ModelImporterMaterialImportMode.None;
+            needsReimport = true;
+        }
+
+        // Configure animation clips
+        ModelImporterClipAnimation[] clipAnimations = animImporter.defaultClipAnimations;
+        if (clipAnimations.Length > 0)
+        {
+            for (int i = 0; i < clipAnimations.Length; i++)
+            {
+                clipAnimations[i].loopTime = true;
+                clipAnimations[i].lockRootRotation = true;
+                clipAnimations[i].lockRootHeightY = true;
+                clipAnimations[i].lockRootPositionXZ = false;
+                clipAnimations[i].keepOriginalPositionY = false;
+                clipAnimations[i].keepOriginalPositionXZ = false;
+                clipAnimations[i].heightFromFeet = true;
+            }
+            animImporter.clipAnimations = clipAnimations;
+            needsReimport = true;
+        }
+
+        if (needsReimport)
+        {
+            animImporter.SaveAndReimport();
+            Debug.Log($"Configured animation: {Path.GetFileName(animFilePath)}");
+        }
     }
 
     private static void ExtractMaterialsFromModel(string modelPath)
