@@ -10,6 +10,7 @@ This is a Unity 6000.3.2f1 (Unity 6) project configured with Universal Render Pi
 
 - **Universal Render Pipeline (URP)**: 17.3.0 - Modern rendering pipeline
 - **Input System**: 1.17.0 - New input system (not the legacy Input Manager)
+- **Animation Rigging**: 1.3.1 - Procedural animation with IK constraints
 - **AI Navigation**: 2.0.9 - NavMesh components
 - **Visual Scripting**: 1.9.9 - Node-based scripting
 - **Timeline**: 1.8.9 - Cinematic and animation sequencing
@@ -41,6 +42,36 @@ When working with Claude Code on this Unity project, follow this workflow:
 3. **User Tests in Unity Editor**: Press Play to test changes
 4. **Provide Feedback**: Report what works/doesn't work
 5. **Iterate**: Repeat steps 1-4 until feature is complete
+
+### Audio Notifications (Task Completion)
+
+Claude Code can play audio notifications when tasks are completed, so you know when long-running operations finish.
+
+**Available Scripts:**
+- `speak.ps1` - PowerShell script for text-to-speech using Windows built-in SAPI
+- `speak.bat` - Batch wrapper for easy calling
+
+**Usage:**
+```bash
+# Direct PowerShell call
+powershell -ExecutionPolicy Bypass -File "E:\repo\unity\My project\speak.ps1" "Task completed successfully"
+
+# Or using the inline command
+powershell -c "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('Task completed')"
+```
+
+**When Claude uses this:**
+- After git operations (commit, push)
+- After long-running compilation or builds
+- When explicitly requested by user
+- When complex multi-step tasks finish
+
+**Benefits:**
+- No need to watch the terminal constantly
+- Audible confirmation when Claude finishes work
+- Can work on other things while Claude executes tasks
+
+**Note:** Uses Windows built-in speech synthesis - no external dependencies required.
 
 ### Automated Setup Tools
 
