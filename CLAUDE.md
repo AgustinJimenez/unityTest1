@@ -196,6 +196,128 @@ To reduce the blocky/chunky appearance of low-poly hair:
 
 See `Assets/Scripts/Editor/ThirdPersonSetup.cs` for the complete implementation of automated Mixamo character setup.
 
+## Importing Mixamo Animations
+
+### Workflow for Character and Animation Files
+
+When working with Mixamo, follow this specific download and import workflow:
+
+**1. Download Character with First Animation:**
+- Go to Mixamo.com and select your character
+- Choose your first animation (e.g., Idle)
+- Download settings:
+  - Format: **FBX for Unity (.fbx)** or **DAE**
+  - Skin: **With Skin**
+- This creates your main character file (e.g., `leonard.dae`)
+
+**2. Download Additional Animations:**
+- Select the same character on Mixamo
+- Choose additional animations (Walk, Run, Jump, etc.)
+- Download settings:
+  - Format: **FBX for Unity (.fbx)** or **DAE**
+  - Skin: **Without Skin** (animation only)
+- Save in a subdirectory (e.g., `Assets/Characters/leonard/Idle/`)
+
+### Import Configuration
+
+**Character Model (With Skin):**
+```csharp
+// In ModelImporter for character file
+modelImporter.animationType = ModelImporterAnimationType.Human;
+modelImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+modelImporter.globalScale = 0.01f; // For DAE files (100x too large)
+```
+
+**Animation Files (Without Skin):**
+```csharp
+// In ModelImporter for animation files
+idleImporter.animationType = ModelImporterAnimationType.Human;
+idleImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+idleImporter.sourceAvatar = characterAvatar; // Use character's avatar
+idleImporter.globalScale = 0.01f; // Match character scale for DAE
+idleImporter.materialImportMode = ModelImporterMaterialImportMode.None; // Don't import materials
+```
+
+### Critical Animation Clip Settings
+
+To prevent character from sinking into ground or appearing in wrong pose:
+
+```csharp
+ModelImporterClipAnimation clip = idleImporter.defaultClipAnimations[0];
+
+// Loop the animation
+clip.loopTime = true;
+
+// Lock root motion (prevent animation from moving character)
+clip.lockRootRotation = true;
+clip.lockRootHeightY = true;
+clip.lockRootPositionXZ = true;
+
+// Don't use animation's baked position data
+clip.keepOriginalPositionY = false;
+clip.keepOriginalPositionXZ = false;
+
+// CRITICAL: Use feet as vertical position reference (not center of mass)
+// This prevents character from sinking into ground
+clip.heightFromFeet = true;
+```
+
+**Why `heightFromFeet = true` is critical:**
+- Mixamo animations default to "Based Upon: Center of Mass" for Root Transform Position (Y)
+- This causes the character to sink into the ground at hip level
+- Setting `heightFromFeet = true` changes it to "Based Upon: Feet"
+- The character now stands properly with feet on the ground
+
+### Animator Controller Setup
+
+**Disable Apply Root Motion:**
+```csharp
+animator.applyRootMotion = false; // Set AFTER assigning controller
+```
+
+Root motion should be disabled when:
+- You're using scripted character movement (CharacterController, Rigidbody)
+- The animation shouldn't move the character's position/rotation
+- You only want the visual animation, not the root transform movement
+
+**Common Issues:**
+- If "Apply Root Motion" is enabled with scripted movement, the character will sink or have positioning conflicts
+- The setting may reset when assigning a new controller, so set it AFTER controller assignment
+
+### Avatar Retargeting
+
+**CRITICAL:** All animation files for the same character must use the SAME avatar:
+- Character file: **Create From This Model**
+- Animation files: **Copy From Other Avatar** (reference the character's avatar)
+
+**Problem if using different avatars:**
+- Even for the same Mixamo character, different avatars can cause pose mismatches
+- Symptoms: bent legs, twisted joints, character in wrong pose
+- Solution: Always copy the avatar from the original character model
+
+### Finding Animation Clips
+
+Animation clips are nested inside model files:
+```csharp
+// Load all assets from the animation file
+UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(animationPath);
+AnimationClip clip = allAssets.OfType<AnimationClip>().FirstOrDefault();
+```
+
+Mixamo animations are typically named "Take 001" by default, not by the animation name.
+
+### Complete Automated Setup
+
+The `ThirdPersonSetup.cs` script automates all of this:
+1. Configures character model with correct scale and avatar
+2. Finds and configures animation files in subdirectories
+3. Sets up avatar copying for animation retargeting
+4. Configures animation clips with proper root transform settings
+5. Creates Animator Controller and adds animation states
+6. Assigns controller and disables Apply Root Motion
+
+See `Assets/Scripts/Editor/ThirdPersonSetup.cs` → `ConfigureIdleAnimation()` and `SetupAnimatorController()` for the complete implementation.
+
 ## Editor Scripts
 
 Scripts in `Editor/` folders run in the Unity Editor, not in builds:
