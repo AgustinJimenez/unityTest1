@@ -25,6 +25,8 @@ internal static class ThirdPersonSetupConfig
     public const string IsSprintingParam = "IsSprinting";
     public const string HorizontalParam = "Horizontal";
     public const string VerticalParam = "Vertical";
+    public const float TurnInPlaceSpeedThreshold = 0.1f;
+    public const float TurnInPlaceInputThreshold = 0.2f;
 
     public const string IdleStateName = "Idle";
     public const string WalkStateName = "Walk";
@@ -33,6 +35,8 @@ internal static class ThirdPersonSetupConfig
     public const string JumpFallStateName = "JumpFall";
     public const string JumpLandStateName = "JumpLand";
     public const string SprintStateName = "Sprint";
+    public const string TurnLeftStateName = "TurnLeft";
+    public const string TurnRightStateName = "TurnRight";
 
     public const string DummyPrefabPath = "Assets/Kevin Iglesias/Human Character Dummy/Prefabs/HumanDummy_M White.prefab";
     public const string DummyPrefabsDir = "Assets/Kevin Iglesias/Human Character Dummy/Prefabs";
@@ -71,6 +75,16 @@ internal static class ThirdPersonSetupConfig
     public static readonly string[] KevinJumpLoopClipPaths =
     {
         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01.fbx"
+    };
+
+    public static readonly string[] KevinTurnLeftClipPaths =
+    {
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Left.fbx"
+    };
+
+    public static readonly string[] KevinTurnRightClipPaths =
+    {
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Right.fbx"
     };
 
     public const string SprintRootMotionPath = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion";

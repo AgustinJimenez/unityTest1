@@ -9,6 +9,8 @@ public class ThirdPersonController : MonoBehaviour
     [SerializeField] private float sprintSpeed = 8f;
     [SerializeField] private float rotationSpeed = 10f;
     [SerializeField] private float acceleration = 10f;
+    [SerializeField] private bool enableTurnInPlace = true;
+    [SerializeField] private float turnInPlaceInputThreshold = 0.2f;
 
     [Header("Jump")]
     [SerializeField] private float jumpHeight = 2f;
@@ -150,12 +152,18 @@ public class ThirdPersonController : MonoBehaviour
         forward.Normalize();
         right.Normalize();
 
-        // Calculate movement direction
-        Vector3 desiredMoveDirection = forward * moveInput.y + right * moveInput.x;
+        bool shouldTurnInPlace = enableTurnInPlace
+            && isGrounded
+            && Mathf.Abs(moveInput.y) < turnInPlaceInputThreshold
+            && Mathf.Abs(moveInput.x) > turnInPlaceInputThreshold;
+
+        Vector3 desiredMoveDirection = shouldTurnInPlace
+            ? right * Mathf.Sign(moveInput.x)
+            : forward * moveInput.y + right * moveInput.x;
 
         // Check if sprinting
         bool isSprinting = sprintAction != null && sprintAction.IsPressed();
-        float targetSpeed = isSprinting ? sprintSpeed : walkSpeed;
+        float targetSpeed = shouldTurnInPlace ? 0f : (isSprinting ? sprintSpeed : walkSpeed);
 
         // Smoothly accelerate
         if (desiredMoveDirection.magnitude > 0.1f)
@@ -172,7 +180,7 @@ public class ThirdPersonController : MonoBehaviour
         }
 
         // Apply movement
-        Vector3 move = desiredMoveDirection.normalized * currentSpeed;
+        Vector3 move = shouldTurnInPlace ? Vector3.zero : desiredMoveDirection.normalized * currentSpeed;
         controller.Move(move * Time.deltaTime);
 
         // Update animator parameters

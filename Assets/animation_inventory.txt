@@ -1,0 +1,297 @@
+## Assets/DoubleL
+Assets/DoubleL/Actions/Action/Action_A_4_1.fbx
+Assets/DoubleL/Actions/Action/Action_A_5_1.fbx
+Assets/DoubleL/Actions/Action/Action_A_5_2.fbx
+Assets/DoubleL/Actions/Ladder/InPlace/Ladder_Down_End_InPlace.fbx
+Assets/DoubleL/Actions/Ladder/InPlace/Ladder_Down_Play_InPlace.fbx
+Assets/DoubleL/Actions/Ladder/InPlace/Ladder_Down_Start_InPlace.fbx
+Assets/DoubleL/Actions/Ladder/InPlace/Ladder_Up_End_InPlace.fbx
+Assets/DoubleL/Actions/Ladder/InPlace/Ladder_Up_Play_InPlace.fbx
+Assets/DoubleL/Actions/Ladder/InPlace/Ladder_Up_Start_InPlace.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Down_End.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Down_Play.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Down_Start.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Idle.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Up_End.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Up_Play.fbx
+Assets/DoubleL/Actions/Ladder/Ladder_Up_Start.fbx
+Assets/DoubleL/Bow/Attack A/Bow_Attack_A_1_All.fbx
+Assets/DoubleL/Bow/Attack B/Bow_Attack_B_1_All.fbx
+Assets/DoubleL/Bow/Movement/Idle/Idle/Bow_Idle_B.fbx
+Assets/DoubleL/Demo/Anim/Action_A_4_1.anim
+Assets/DoubleL/Demo/Anim/Action_A_5_1.anim
+Assets/DoubleL/Demo/Anim/Action_A_5_2.anim
+Assets/DoubleL/Demo/Anim/Dialogue_1.anim
+Assets/DoubleL/Demo/Anim/Dialogue_2.anim
+Assets/DoubleL/Demo/Anim/Dialogue_3.anim
+Assets/DoubleL/Demo/Anim/Dialogue_4.anim
+Assets/DoubleL/Demo/Anim/Dialogue_5.anim
+Assets/DoubleL/Demo/Anim/Enemy_Attack_1.anim
+Assets/DoubleL/Demo/Anim/Enemy_Attack_1_InPlace.anim
+Assets/DoubleL/Demo/Anim/Enemy_Attack_1_Run.anim
+Assets/DoubleL/Demo/Anim/Enemy_Attack_1_Run_InPlace.anim
+Assets/DoubleL/Demo/Anim/Hit_F_1.anim
+Assets/DoubleL/Demo/Anim/Hit_F_1_InPlace.anim
+Assets/DoubleL/Demo/Anim/Hit_F_2.anim
+Assets/DoubleL/Demo/Anim/Hit_F_2_InPlace.anim
+Assets/DoubleL/Demo/Anim/Ladder_Down_End.anim
+Assets/DoubleL/Demo/Anim/Ladder_Down_End_InPlace.anim
+Assets/DoubleL/Demo/Anim/Ladder_Down_Play.anim
+Assets/DoubleL/Demo/Anim/Ladder_Down_Play_InPlace.anim
+Assets/DoubleL/Demo/Anim/Ladder_Down_Start.anim
+Assets/DoubleL/Demo/Anim/Ladder_Down_Start_InPlace.anim
+Assets/DoubleL/Demo/Anim/Ladder_Idle.anim
+Assets/DoubleL/Demo/Anim/Ladder_Up_End.anim
+Assets/DoubleL/Demo/Anim/Ladder_Up_End_InPlace.anim
+Assets/DoubleL/Demo/Anim/Ladder_Up_Play.anim
+Assets/DoubleL/Demo/Anim/Ladder_Up_Play_InPlace.anim
+Assets/DoubleL/Demo/Anim/Ladder_Up_Start.anim
+Assets/DoubleL/Demo/Anim/Ladder_Up_Start_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Idle.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_B.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_B_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_F.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_F_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_L.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_L_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_R.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Run_R_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Hit_1.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Hit_1_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Idle.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Sprint.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Sprint_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_B.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_B_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_F.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_F_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_L.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_L_InPlace.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_R.anim
+Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_R_InPlace.anim
+Assets/DoubleL/Enemy Attack/Enemy_Attack_1.fbx
+Assets/DoubleL/Enemy Attack/Enemy_Attack_1_Run.fbx
+Assets/DoubleL/Enemy Attack/InPlace/Enemy_Attack_1_InPlace.fbx
+Assets/DoubleL/Enemy Attack/InPlace/Enemy_Attack_1_Run_InPlace.fbx
+Assets/DoubleL/Hit/Hit_F_1.fbx
+Assets/DoubleL/Hit/Hit_F_2.fbx
+Assets/DoubleL/Hit/InPlace/Hit_F_1_InPlace.fbx
+Assets/DoubleL/Hit/InPlace/Hit_F_2_InPlace.fbx
+Assets/DoubleL/Model/Armature.fbx
+Assets/DoubleL/Model/SM_Wep_Shield_01.fbx
+Assets/DoubleL/Model/SM_Wep_Sword_03.fbx
+Assets/DoubleL/Model/T-Pose.fbx
+Assets/DoubleL/NPC/Dialogue/Dialogue_1.fbx
+Assets/DoubleL/NPC/Dialogue/Dialogue_2.fbx
+Assets/DoubleL/NPC/Dialogue/Dialogue_3.fbx
+Assets/DoubleL/NPC/Dialogue/Dialogue_4.fbx
+Assets/DoubleL/NPC/Dialogue/Dialogue_5.fbx
+Assets/DoubleL/One Hand Up/Attack_A/InPlace/OneHand_Up_Attack_A_1_InPlace.fbx
+Assets/DoubleL/One Hand Up/Attack_A/InPlace/OneHand_Up_Attack_A_2_InPlace.fbx
+Assets/DoubleL/One Hand Up/Attack_A/InPlace/OneHand_Up_Attack_A_3_InPlace.fbx
+Assets/DoubleL/One Hand Up/Attack_A/OneHand_Up_Attack_A_1.fbx
+Assets/DoubleL/One Hand Up/Attack_A/OneHand_Up_Attack_A_2.fbx
+Assets/DoubleL/One Hand Up/Attack_A/OneHand_Up_Attack_A_3.fbx
+Assets/DoubleL/One Hand Up/Attack_B/InPlace/OneHand_Up_Attack_B_1_InPlace.fbx
+Assets/DoubleL/One Hand Up/Attack_B/InPlace/OneHand_Up_Attack_B_2_InPlace.fbx
+Assets/DoubleL/One Hand Up/Attack_B/InPlace/OneHand_Up_Attack_B_3_InPlace.fbx
+Assets/DoubleL/One Hand Up/Attack_B/OneHand_Up_Attack_B_1.fbx
+Assets/DoubleL/One Hand Up/Attack_B/OneHand_Up_Attack_B_2.fbx
+Assets/DoubleL/One Hand Up/Attack_B/OneHand_Up_Attack_B_3.fbx
+Assets/DoubleL/One Hand Up/Jump/InPlace/OneHand_Up_Jump_B_InPlace.fbx
+Assets/DoubleL/One Hand Up/Jump/OneHand_Up_Jump_B.fbx
+Assets/DoubleL/One Hand Up/Movement/Crouch/Base/InPlace/OneHand_Up_Crouch_F_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Crouch/Base/OneHand_Up_Crouch_F.fbx
+Assets/DoubleL/One Hand Up/Movement/Crouch/Idle/Idle/OneHand_Up_Crouch_Idle_1.fbx
+Assets/DoubleL/One Hand Up/Movement/Idle/Idle/OneHand_Up_Stand_Idle_A_2.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/OneHand_Up_Run_B_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/OneHand_Up_Run_F_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/OneHand_Up_Run_F_L90_A_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/OneHand_Up_Run_F_R90_A_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/OneHand_Up_Run_B.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/OneHand_Up_Run_F.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/OneHand_Up_Run_F_L90_A.fbx
+Assets/DoubleL/One Hand Up/Movement/Run/Base/OneHand_Up_Run_F_R90_A.fbx
+Assets/DoubleL/One Hand Up/Movement/Sprint/Base/InPlace/OneHand_Up_Sprint_F_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Sprint/Base/OneHand_Up_Sprint_F.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/OneHand_Up_Walk_B_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/OneHand_Up_Walk_F_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/OneHand_Up_Walk_F_L90_A_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/OneHand_Up_Walk_F_R90_A_InPlace.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/OneHand_Up_Walk_B.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/OneHand_Up_Walk_F.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/OneHand_Up_Walk_F_L90_A.fbx
+Assets/DoubleL/One Hand Up/Movement/Walk/Base/OneHand_Up_Walk_F_R90_A.fbx
+Assets/DoubleL/One Hand Up/Sheild/Hit/InPlace/OneHand_Up_Shield_Block_Hit_1_InPlace.fbx
+Assets/DoubleL/One Hand Up/Sheild/Hit/OneHand_Up_Shield_Block_Hit_1.fbx
+Assets/DoubleL/One Hand Up/Sheild/Idle/OneHand_Up_Shield_Block_Idle.fbx
+
+## Assets/ExplosiveLLC
+Assets/ExplosiveLLC/RPG Character Mecanim Animation Pack FREE/Demo Elements/Animation/Moving Platform Animation.anim
+Assets/ExplosiveLLC/RPG Character Mecanim Animation Pack FREE/Demo Elements/Animation/TargetUpDown.anim
+
+## Assets/Kevin Iglesias
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Idles/HumanF@Idle01-Idle02.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Idles/HumanF@Idle01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Idles/HumanF@Idle02-Idle01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Idles/HumanF@Idle02.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Fall01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Jump01 - Begin.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Jump01 - Land.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Jump01 [RM] - Begin.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Jump01 [RM] - Land.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Jump01 [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Jump/HumanF@Jump01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Backward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_BackwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_BackwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Forward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_ForwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_ForwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_Backward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_BackwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_BackwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_Forward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_ForwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_ForwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/RootMotion/HumanF@Run01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/HumanF@Sprint01_Forward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/HumanF@Sprint01_ForwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/HumanF@Sprint01_ForwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/HumanF@Sprint01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/HumanF@Sprint01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/RootMotion/HumanF@Sprint01_Forward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/RootMotion/HumanF@Sprint01_ForwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/RootMotion/HumanF@Sprint01_ForwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/RootMotion/HumanF@Sprint01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Sprint/RootMotion/HumanF@Sprint01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Turn/HumanF@Turn01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Turn/HumanF@Turn01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Turn/HumanF@Turn01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Turn/HumanF@Turn01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Backward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_BackwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_BackwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Forward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_ForwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_ForwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_Backward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_BackwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_BackwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_Forward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_ForwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_ForwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/RootMotion/HumanF@Walk01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Female/Social/Conversation/HumanF@Talk01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle01-Idle02.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle02-Idle01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle02.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Land.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 [RM] - Begin.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 [RM] - Land.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Backward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_BackwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_BackwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_Backward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_BackwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_BackwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_Forward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_ForwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_ForwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/RootMotion/HumanM@Run01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/HumanM@Sprint01_Forward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/HumanM@Sprint01_ForwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/HumanM@Sprint01_ForwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/HumanM@Sprint01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/HumanM@Sprint01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion/HumanM@Sprint01_Forward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion/HumanM@Sprint01_ForwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion/HumanM@Sprint01_ForwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion/HumanM@Sprint01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion/HumanM@Sprint01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Backward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_BackwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_BackwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_ForwardLeft.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_ForwardRight.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Left.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Right.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_Backward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_BackwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_BackwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_Forward [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_ForwardLeft [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_ForwardRight [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_Left [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/RootMotion/HumanM@Walk01_Right [RM].fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Male/Social/Conversation/HumanM@Talk01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/Human@HandsClosed01.fbx
+Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/Human@ObjectGripHands01.fbx
+Assets/Kevin Iglesias/Human Animations/Models/HumanF_Model.fbx
+Assets/Kevin Iglesias/Human Animations/Models/HumanM_Model.fbx
+Assets/Kevin Iglesias/Human Character Dummy/Models/HumanCharacterDummy_F.fbx
+Assets/Kevin Iglesias/Human Character Dummy/Models/HumanCharacterDummy_M.fbx
+
+## Assets/VanillaLoopStudio
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/CoverSet/Mannequin/RootMotion/A_CoverHi_Walk_L_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/DBNOSet/Mannequin/RootMotion/02/A_DBNO_02_Fwd_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/FemaleLocomotionSet/Mannequin/RootMotion/A_JogFwd_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/ItemPickupSet/Mannequin/A_ItemPickup_fromIdle_RH_100cm.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/LadderSet/Mannequin/RootMotion/A_Ladder_Up_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/LiftSet/Mannequin/InPlace/Lightweight/02/R/A_Lift_Light_PickUp_0cm_02_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/MaleLocomotionSet/Mannequin/RootMotion/A_RunFwd_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/NarrowPassageSet/Mannequin/RootMotion/01/A/A_NarrowPassage_01_a_Loop_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/PushSet/RootMotion/Heavy/01/A_Push_Heavy_01_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/ResourceGatheringSet/Mannequin/Mining/PickAxe/2H/A_Mining_PickAxe_2H_01_Loop_01.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/RollDodgeDashSet/Mannequin/RootMotion/Roll/A_Roll_IdleFwd.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/StairsSet/Mannequin/RootMotion/Walk/A_Stairs_WalkFwd_Up_Loop.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/StorageUnitsSet/Mannequin/LockerSingleKnob/Idle/RightHand/100cm/A_LockerSingleKnob_100cm_Open_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Animations/SurvivalSet/Mannequin/Flashlight/Idle/RightHand/Type01/A_Flashlight_Idle_01_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/LadderSet/SM_Ladder_Base.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/LadderSet/SM_Ladder_Module.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/LadderSet/SM_Ladder_Top_Round.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/Robot Kyle.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/SkeletonSettings.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/StorageUnitsSet/LockerSingleKnob/100cm/Animations/RightHand/LockeKnob_100cm_Close_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/StorageUnitsSet/LockerSingleKnob/100cm/Animations/RightHand/LockerKnob_100cm_Open_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/StorageUnitsSet/LockerSingleKnob/100cm/Mesh/SKM_LockerSingleKnob_100cm.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/StorageUnitsSet/SchoolLockerFullSize/Animations/RightHand/A_Schoo_01_Open_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/StorageUnitsSet/SchoolLockerFullSize/Animations/RightHand/A_SchoolLockerFullSize_01_Close_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/StorageUnitsSet/SchoolLockerFullSize/Mesh/SKM_SchoolLockerFullSize_R.fbx
+Assets/VanillaLoopStudio/FreeSampleAnimationSet/Art/Meshes/SurvivalSet/SK_Flashlight.fbx

@@ -71,9 +71,16 @@ public partial class ThirdPersonSetup
             controller.AddParameter(ThirdPersonSetupConfig.IsGroundedParam, UnityEngine.AnimatorControllerParameterType.Bool);
         }
 
+        if (System.Array.Find(controller.parameters, p => p.name == ThirdPersonSetupConfig.HorizontalParam) == null)
+        {
+            controller.AddParameter(ThirdPersonSetupConfig.HorizontalParam, UnityEngine.AnimatorControllerParameterType.Float);
+        }
+
         // Create or update animation states
         UnityEditor.Animations.AnimatorState idleState = null;
         UnityEditor.Animations.AnimatorState walkState = null;
+        UnityEditor.Animations.AnimatorState turnLeftState = null;
+        UnityEditor.Animations.AnimatorState turnRightState = null;
         UnityEditor.Animations.AnimatorState jumpBeginState = null;
         UnityEditor.Animations.AnimatorState jumpLoopState = null;
         UnityEditor.Animations.AnimatorState jumpFallState = null;
@@ -97,6 +104,15 @@ public partial class ThirdPersonSetup
 
         EnsureStateMotion(idleState, ThirdPersonSetupConfig.KevinIdleClipPaths);
         EnsureStateMotion(walkState, ThirdPersonSetupConfig.KevinWalkClipPaths);
+
+        ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinTurnLeftClipPaths, avatarSourcePath);
+        ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinTurnRightClipPaths, avatarSourcePath);
+
+        turnLeftState = GetOrCreateState(stateMachine, ThirdPersonSetupConfig.TurnLeftStateName, null);
+        turnRightState = GetOrCreateState(stateMachine, ThirdPersonSetupConfig.TurnRightStateName, null);
+
+        EnsureStateMotion(turnLeftState, ThirdPersonSetupConfig.KevinTurnLeftClipPaths);
+        EnsureStateMotion(turnRightState, ThirdPersonSetupConfig.KevinTurnRightClipPaths);
 
         // Create Jump states
         if (animations.ContainsKey("JumpBegin"))
@@ -189,6 +205,78 @@ public partial class ThirdPersonSetup
                             transition.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
                         }
                     }
+                }
+            }
+        }
+
+        if (turnLeftState != null && idleState != null)
+        {
+            bool hasIdleToTurnLeft = System.Array.Exists(idleState.transitions, t => t.destinationState == turnLeftState);
+            if (!hasIdleToTurnLeft)
+            {
+                var idleToTurnLeft = idleState.AddTransition(turnLeftState);
+                idleToTurnLeft.hasExitTime = false;
+                idleToTurnLeft.duration = 0.05f;
+                idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
+                idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
+                idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, -ThirdPersonSetupConfig.TurnInPlaceInputThreshold, ThirdPersonSetupConfig.HorizontalParam);
+            }
+
+            bool hasTurnLeftToIdle = System.Array.Exists(turnLeftState.transitions, t => t.destinationState == idleState);
+            if (!hasTurnLeftToIdle)
+            {
+                var turnLeftToIdle = turnLeftState.AddTransition(idleState);
+                turnLeftToIdle.hasExitTime = true;
+                turnLeftToIdle.exitTime = 0.9f;
+                turnLeftToIdle.duration = 0.05f;
+                turnLeftToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
+            }
+
+            if (walkState != null)
+            {
+                bool hasTurnLeftToWalk = System.Array.Exists(turnLeftState.transitions, t => t.destinationState == walkState);
+                if (!hasTurnLeftToWalk)
+                {
+                    var turnLeftToWalk = turnLeftState.AddTransition(walkState);
+                    turnLeftToWalk.hasExitTime = false;
+                    turnLeftToWalk.duration = 0.05f;
+                    turnLeftToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
+                }
+            }
+        }
+
+        if (turnRightState != null && idleState != null)
+        {
+            bool hasIdleToTurnRight = System.Array.Exists(idleState.transitions, t => t.destinationState == turnRightState);
+            if (!hasIdleToTurnRight)
+            {
+                var idleToTurnRight = idleState.AddTransition(turnRightState);
+                idleToTurnRight.hasExitTime = false;
+                idleToTurnRight.duration = 0.05f;
+                idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
+                idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
+                idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, ThirdPersonSetupConfig.TurnInPlaceInputThreshold, ThirdPersonSetupConfig.HorizontalParam);
+            }
+
+            bool hasTurnRightToIdle = System.Array.Exists(turnRightState.transitions, t => t.destinationState == idleState);
+            if (!hasTurnRightToIdle)
+            {
+                var turnRightToIdle = turnRightState.AddTransition(idleState);
+                turnRightToIdle.hasExitTime = true;
+                turnRightToIdle.exitTime = 0.9f;
+                turnRightToIdle.duration = 0.05f;
+                turnRightToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
+            }
+
+            if (walkState != null)
+            {
+                bool hasTurnRightToWalk = System.Array.Exists(turnRightState.transitions, t => t.destinationState == walkState);
+                if (!hasTurnRightToWalk)
+                {
+                    var turnRightToWalk = turnRightState.AddTransition(walkState);
+                    turnRightToWalk.hasExitTime = false;
+                    turnRightToWalk.duration = 0.05f;
+                    turnRightToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
                 }
             }
         }
@@ -654,8 +742,9 @@ public partial class ThirdPersonSetup
                 bool isJumpBegin = clipNameLower.Contains("begin") || pathLower.Contains("begin");
                 bool isJumpLand = clipNameLower.Contains("land") || pathLower.Contains("land");
                 bool isJumpFall = clipNameLower.Contains("fall") || pathLower.Contains("fall");
+                bool isTurn = clipNameLower.Contains("turn") || pathLower.Contains("turn");
 
-                clipAnimations[i].loopTime = !isJumpBegin && !isJumpLand;
+                clipAnimations[i].loopTime = !isJumpBegin && !isJumpLand && !isTurn;
                 if (isJumpFall)
                 {
                     clipAnimations[i].loopTime = true;
