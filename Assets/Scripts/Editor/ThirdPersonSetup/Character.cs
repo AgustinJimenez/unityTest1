@@ -6,13 +6,17 @@ public partial class ThirdPersonSetup
 {
     private static readonly System.Collections.Generic.Dictionary<string, string[]> AssetGuidCache =
         new System.Collections.Generic.Dictionary<string, string[]>();
+    private static readonly System.Collections.Generic.Dictionary<string, GameObject> AssetObjectCache =
+        new System.Collections.Generic.Dictionary<string, GameObject>();
+    private static readonly System.Collections.Generic.Dictionary<string, bool> AssetExistsCache =
+        new System.Collections.Generic.Dictionary<string, bool>();
 
     private static bool TryApplyCharacterModel(GameObject player)
     {
         GameObject characterPrefab = null;
 
         // Prefer the Kevin Iglesias Human Character Dummy prefab if available.
-        characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ThirdPersonSetupConfig.DummyPrefabPath);
+        characterPrefab = LoadAssetCached<GameObject>(ThirdPersonSetupConfig.DummyPrefabPath);
 
         if (characterPrefab == null)
         {
@@ -20,7 +24,7 @@ public partial class ThirdPersonSetup
             if (dummyGuids.Length > 0)
             {
                 string dummyPath = AssetDatabase.GUIDToAssetPath(dummyGuids[0]);
-                characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(dummyPath);
+                characterPrefab = LoadAssetCached<GameObject>(dummyPath);
             }
         }
 
@@ -41,7 +45,7 @@ public partial class ThirdPersonSetup
                         string path = AssetDatabase.GUIDToAssetPath(guid);
                         if (path.EndsWith(".dae") || path.EndsWith(".fbx"))
                         {
-                            characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                            characterPrefab = LoadAssetCached<GameObject>(path);
                             if (characterPrefab != null)
                             {
                                 break;
@@ -78,7 +82,7 @@ public partial class ThirdPersonSetup
         string avatarModelPath = GetModelPathFromPrefab(prefabPath);
         string avatarSourcePath = string.IsNullOrEmpty(avatarModelPath) ? prefabPath : avatarModelPath;
 
-        if (avatarSourcePath.EndsWith(".dae"))
+        if (avatarSourcePath.EndsWith(".dae") && FileExistsCached(avatarSourcePath))
         {
             ConfigureCharacterModel(avatarSourcePath);
             ExtractMaterialsFromModel(avatarSourcePath);
@@ -713,6 +717,45 @@ public partial class ThirdPersonSetup
             : AssetDatabase.FindAssets(filter, searchDirs);
         AssetGuidCache[key] = guids;
         return guids;
+    }
+
+    private static T LoadAssetCached<T>(string assetPath) where T : UnityEngine.Object
+    {
+        if (string.IsNullOrEmpty(assetPath))
+        {
+            return null;
+        }
+
+        string key = $"{typeof(T).FullName}::{assetPath}";
+        if (AssetObjectCache.TryGetValue(key, out GameObject cached))
+        {
+            return cached as T;
+        }
+
+        T asset = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+        if (asset is GameObject go)
+        {
+            AssetObjectCache[key] = go;
+        }
+
+        return asset;
+    }
+
+    private static bool FileExistsCached(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        if (AssetExistsCache.TryGetValue(path, out bool exists))
+        {
+            return exists;
+        }
+
+        exists = System.IO.File.Exists(path);
+        AssetExistsCache[path] = exists;
+        return exists;
     }
     private static void EnsureNormalMapSettings(string texturePath)
     {
