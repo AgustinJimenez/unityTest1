@@ -910,6 +910,29 @@ public partial class ThirdPersonSetup
             return;
         }
 
+        if (controller.layers == null || controller.layers.Length == 0 || controller.layers[0].stateMachine == null)
+        {
+            ReportError("Animator controller has no valid state machine.");
+            return;
+        }
+
+        string[] requiredParams =
+        {
+            ThirdPersonSetupConfig.SpeedParam,
+            ThirdPersonSetupConfig.IsGroundedParam,
+            ThirdPersonSetupConfig.JumpParam,
+            ThirdPersonSetupConfig.VerticalVelocityParam
+        };
+
+        foreach (string param in requiredParams)
+        {
+            bool exists = System.Array.Exists(controller.parameters, p => p.name == param);
+            if (!exists)
+            {
+                ReportInfo($"Animator parameter missing (will be added): {param}");
+            }
+        }
+
         if (!animations.ContainsKey(ThirdPersonSetupConfig.IdleStateName))
         {
             ReportWarning("Idle animation clip not found.");
@@ -926,6 +949,14 @@ public partial class ThirdPersonSetup
             && !animations.ContainsKey(ThirdPersonSetupConfig.JumpLandStateName))
         {
             ReportWarning("Jump animation clips not found (begin/loop/fall/land).");
+        }
+
+        foreach (var pair in animations)
+        {
+            if (pair.Value == null)
+            {
+                ReportWarning($"Animation clip is null for key: {pair.Key}");
+            }
         }
     }
 
