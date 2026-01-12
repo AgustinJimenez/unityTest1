@@ -4,6 +4,9 @@ using System.IO;
 
 public partial class ThirdPersonSetup
 {
+    private static readonly System.Collections.Generic.Dictionary<string, string[]> AssetGuidCache =
+        new System.Collections.Generic.Dictionary<string, string[]>();
+
     private static bool TryApplyCharacterModel(GameObject player)
     {
         GameObject characterPrefab = null;
@@ -13,7 +16,7 @@ public partial class ThirdPersonSetup
 
         if (characterPrefab == null)
         {
-            string[] dummyGuids = AssetDatabase.FindAssets("t:GameObject", new[] { ThirdPersonSetupConfig.DummyPrefabsDir });
+            string[] dummyGuids = GetAssetGuidsCached("t:GameObject", new[] { ThirdPersonSetupConfig.DummyPrefabsDir });
             if (dummyGuids.Length > 0)
             {
                 string dummyPath = AssetDatabase.GUIDToAssetPath(dummyGuids[0]);
@@ -29,7 +32,7 @@ public partial class ThirdPersonSetup
             foreach (string term in searchTerms)
             {
                 // Search for both FBX and DAE models
-                string[] guids = AssetDatabase.FindAssets(term + " t:GameObject");
+                string[] guids = GetAssetGuidsCached(term + " t:GameObject", null);
                 if (guids.Length > 0)
                 {
                     // Prefer DAE files if available (better texture support)
@@ -263,7 +266,7 @@ public partial class ThirdPersonSetup
         Debug.Log("=== FIXING MATERIAL TEXTURES ===");
 
         // Find all materials in Characters folder and subfolders
-        string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { ThirdPersonSetupConfig.CharactersRootPath });
+        string[] materialGuids = GetAssetGuidsCached("t:Material", new[] { ThirdPersonSetupConfig.CharactersRootPath });
 
         if (materialGuids.Length == 0)
         {
@@ -333,7 +336,8 @@ public partial class ThirdPersonSetup
             EditorUtility.SetDirty(material);
 
             // Find textures with matching prefix
-            string[] textureGuids = AssetDatabase.FindAssets($"{prefix} t:Texture2D", new[] { ThirdPersonSetupConfig.CharactersRootPath });
+            string[] textureGuids = GetAssetGuidsCached($"{prefix} t:Texture2D",
+                new[] { ThirdPersonSetupConfig.CharactersRootPath });
 
             if (textureGuids.Length == 0)
             {
@@ -477,7 +481,7 @@ public partial class ThirdPersonSetup
         Debug.Log("Converting materials to URP...");
 
         // Find all materials in Characters folder
-        string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { ThirdPersonSetupConfig.CharactersRootPath });
+        string[] materialGuids = GetAssetGuidsCached("t:Material", new[] { ThirdPersonSetupConfig.CharactersRootPath });
 
         foreach (string guid in materialGuids)
         {
@@ -550,7 +554,7 @@ public partial class ThirdPersonSetup
         MeshRenderer[] meshRenderers = characterModel.GetComponentsInChildren<MeshRenderer>();
 
         // Reload materials from Characters materials folder
-        string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { ThirdPersonSetupConfig.CharactersRootPath });
+        string[] materialGuids = GetAssetGuidsCached("t:Material", new[] { ThirdPersonSetupConfig.CharactersRootPath });
 
         foreach (SkinnedMeshRenderer renderer in skinnedRenderers)
         {
@@ -652,7 +656,8 @@ public partial class ThirdPersonSetup
         eyelashMaterial.SetFloat("_Cutoff", 0.5f); // Alpha cutoff threshold
 
         // Use hair texture as base
-        string[] textureGuids = AssetDatabase.FindAssets($"{ThirdPersonSetupConfig.HairDiffuseSearch} t:Texture2D", new[] { ThirdPersonSetupConfig.CharactersRootPath });
+        string[] textureGuids = GetAssetGuidsCached($"{ThirdPersonSetupConfig.HairDiffuseSearch} t:Texture2D",
+            new[] { ThirdPersonSetupConfig.CharactersRootPath });
         if (textureGuids.Length > 0)
         {
             string texturePath = AssetDatabase.GUIDToAssetPath(textureGuids[0]);
@@ -693,6 +698,21 @@ public partial class ThirdPersonSetup
         // Apply to eyelash renderer
         eyelashRenderer.sharedMaterial = eyelashMaterial;
         Debug.Log("Applied eyelash material to mesh");
+    }
+
+    private static string[] GetAssetGuidsCached(string filter, string[] searchDirs)
+    {
+        string key = searchDirs == null ? filter : $"{filter}::{string.Join("|", searchDirs)}";
+        if (AssetGuidCache.TryGetValue(key, out string[] cached))
+        {
+            return cached;
+        }
+
+        string[] guids = searchDirs == null
+            ? AssetDatabase.FindAssets(filter)
+            : AssetDatabase.FindAssets(filter, searchDirs);
+        AssetGuidCache[key] = guids;
+        return guids;
     }
     private static void EnsureNormalMapSettings(string texturePath)
     {

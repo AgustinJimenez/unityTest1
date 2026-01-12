@@ -4,6 +4,7 @@ using UnityEditor;
 public partial class ThirdPersonSetup : EditorWindow
 {
     private const string AutoRunPrefsKey = "ThirdPersonSetup.AutoRun";
+    private const string DryRunPrefsKey = "ThirdPersonSetup.DryRun";
 
     [InitializeOnLoadMethod]
     private static void AutoRunOnCompile()
@@ -37,6 +38,14 @@ public partial class ThirdPersonSetup : EditorWindow
         Debug.Log($"ThirdPerson auto-run set to {!current}");
     }
 
+    [MenuItem("Tools/Third Person/Dry Run Setup")]
+    private static void ToggleDryRun()
+    {
+        bool current = EditorPrefs.GetBool(DryRunPrefsKey, false);
+        EditorPrefs.SetBool(DryRunPrefsKey, !current);
+        Debug.Log($"ThirdPerson dry-run set to {!current}");
+    }
+
     [MenuItem("Tools/Third Person/Complete Setup")]
     public static void CompleteSetup()
     {
@@ -46,6 +55,13 @@ public partial class ThirdPersonSetup : EditorWindow
     private static void PerformCompleteSetup()
     {
         ResetReport();
+        if (EditorPrefs.GetBool(DryRunPrefsKey, false))
+        {
+            ReportInfo("Dry run enabled: no assets will be modified.");
+            DescribeDryRunPlan();
+            PrintReportSummary();
+            return;
+        }
 
         // Step 1: Clean up existing setup first
         CleanupExistingSetup();
@@ -82,6 +98,7 @@ public partial class ThirdPersonSetup : EditorWindow
         Debug.Log("=== THIRD PERSON SETUP COMPLETE ===");
         Debug.Log($"Created: Player {(characterApplied ? "(with character model)" : "(capsule)")}, Camera, Ground");
         Debug.Log("Press PLAY to test! Controls: WASD=Move, Mouse=Look, Space=Jump, Shift=Sprint");
+        CheckTmpSettingsAsset();
         PrintReportSummary();
     }
 }

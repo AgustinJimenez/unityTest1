@@ -67,4 +67,14 @@ public partial class ThirdPersonSetup
     private static void ReportWarning(string message) => Report.AddWarning(message);
     private static void ReportError(string message) => Report.AddError(message);
     private static void PrintReportSummary() => Report.PrintSummary();
+
+    private static void CheckTmpSettingsAsset()
+    {
+        const string tmpSettingsPath = "Assets/TextMesh Pro/Resources/TMP Settings.asset";
+        UnityEngine.Object asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(tmpSettingsPath);
+        if (asset == null)
+        {
+            ReportWarning("TextMeshPro settings asset missing. Import TMP Essentials or assign TMP Settings in Project Settings.");
+        }
+    }
 }
