@@ -50,6 +50,10 @@ public partial class ThirdPersonSetup
         {
             AddAnimationsFromDirs(animations, ThirdPersonSetupConfig.KevinFallbackDirs);
         }
+        if (animations.Count == 0)
+        {
+            ReportWarning("No animation clips found for Idle/Walk/Jump; animator states may be empty.");
+        }
 
         // Add Speed parameter for movement
         if (controller.parameters.Length == 0 || System.Array.Find(controller.parameters, p => p.name == ThirdPersonSetupConfig.SpeedParam) == null)

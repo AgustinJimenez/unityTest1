@@ -45,6 +45,8 @@ public partial class ThirdPersonSetup : EditorWindow
 
     private static void PerformCompleteSetup()
     {
+        ResetReport();
+
         // Step 1: Clean up existing setup first
         CleanupExistingSetup();
 
@@ -80,5 +82,6 @@ public partial class ThirdPersonSetup : EditorWindow
         Debug.Log("=== THIRD PERSON SETUP COMPLETE ===");
         Debug.Log($"Created: Player {(characterApplied ? "(with character model)" : "(capsule)")}, Camera, Ground");
         Debug.Log("Press PLAY to test! Controls: WASD=Move, Mouse=Look, Space=Jump, Shift=Sprint");
+        PrintReportSummary();
     }
 }

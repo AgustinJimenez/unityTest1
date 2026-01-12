@@ -52,6 +52,7 @@ public partial class ThirdPersonSetup
 
         if (characterPrefab == null)
         {
+            ReportWarning("No character prefab found; using capsule only.");
             return false;
         }
 

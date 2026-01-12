@@ -28,6 +28,7 @@ public partial class ThirdPersonSetup
             if (importer == null)
             {
                 Debug.LogError($"Could not find ModelImporter for: {animPath}");
+                ReportWarning($"Sprint clip missing importer: {animPath}");
                 continue;
             }
 
@@ -110,6 +111,7 @@ public partial class ThirdPersonSetup
         if (controller == null)
         {
             Debug.LogError("Could not find an active AnimatorController to add sprint animations.");
+            ReportError("Sprint setup skipped: no active AnimatorController.");
             return;
         }
 
@@ -136,6 +138,7 @@ public partial class ThirdPersonSetup
         {
             Debug.LogError("Sprint Setup Failed: No animation clips found in Kevin Iglesias Sprint animations.");
             Debug.LogError($"Please select one of the .fbx files in {ThirdPersonSetupConfig.SprintRootMotionPath} and check if animations are imported.");
+            ReportWarning("Sprint setup skipped: no sprint clips were loaded.");
             return;
         }
 
