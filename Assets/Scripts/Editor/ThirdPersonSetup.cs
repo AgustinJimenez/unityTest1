@@ -5,6 +5,40 @@ using System.IO;
 
 public class ThirdPersonSetup : EditorWindow
 {
+    private const string AutoRunPrefsKey = "ThirdPersonSetup.AutoRun";
+
+    [InitializeOnLoadMethod]
+    private static void AutoRunOnCompile()
+    {
+        if (!EditorPrefs.GetBool(AutoRunPrefsKey, true))
+        {
+            return;
+        }
+
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return;
+        }
+
+        EditorApplication.delayCall += () =>
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
+            PerformCompleteSetup();
+        };
+    }
+
+    [MenuItem("Tools/Third Person/Auto Run Setup")]
+    private static void ToggleAutoRun()
+    {
+        bool current = EditorPrefs.GetBool(AutoRunPrefsKey, true);
+        EditorPrefs.SetBool(AutoRunPrefsKey, !current);
+        Debug.Log($"ThirdPerson auto-run set to {!current}");
+    }
+
     [MenuItem("Tools/Third Person/Complete Setup")]
     public static void CompleteSetup()
     {
@@ -219,30 +253,48 @@ public class ThirdPersonSetup : EditorWindow
 
     private static bool TryApplyCharacterModel(GameObject player)
     {
-        // Try to find character model (looking for common Mixamo character names and formats)
-        string[] searchTerms = { "leonard", "leonard_character", "character", "mixamo" };
         GameObject characterPrefab = null;
 
-        foreach (string term in searchTerms)
+        // Prefer the Kevin Iglesias Human Character Dummy prefab if available.
+        string preferredDummyPrefabPath = "Assets/Kevin Iglesias/Human Character Dummy/Prefabs/HumanDummy_M White.prefab";
+        characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(preferredDummyPrefabPath);
+
+        if (characterPrefab == null)
         {
-            // Search for both FBX and DAE models
-            string[] guids = AssetDatabase.FindAssets(term + " t:GameObject");
-            if (guids.Length > 0)
+            string[] dummyGuids = AssetDatabase.FindAssets("t:GameObject", new[] { "Assets/Kevin Iglesias/Human Character Dummy/Prefabs" });
+            if (dummyGuids.Length > 0)
             {
-                // Prefer DAE files if available (better texture support)
-                foreach (string guid in guids)
+                string dummyPath = AssetDatabase.GUIDToAssetPath(dummyGuids[0]);
+                characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(dummyPath);
+            }
+        }
+
+        // Fallback to Mixamo-style models if the dummy isn't found.
+        string[] searchTerms = { "leonard", "leonard_character", "character", "mixamo" };
+
+        if (characterPrefab == null)
+        {
+            foreach (string term in searchTerms)
+            {
+                // Search for both FBX and DAE models
+                string[] guids = AssetDatabase.FindAssets(term + " t:GameObject");
+                if (guids.Length > 0)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (path.EndsWith(".dae") || path.EndsWith(".fbx"))
+                    // Prefer DAE files if available (better texture support)
+                    foreach (string guid in guids)
                     {
-                        characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                        if (characterPrefab != null)
+                        string path = AssetDatabase.GUIDToAssetPath(guid);
+                        if (path.EndsWith(".dae") || path.EndsWith(".fbx"))
                         {
-                            break;
+                            characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                            if (characterPrefab != null)
+                            {
+                                break;
+                            }
                         }
                     }
+                    if (characterPrefab != null) break;
                 }
-                if (characterPrefab != null) break;
             }
         }
 
@@ -265,12 +317,15 @@ public class ThirdPersonSetup : EditorWindow
             Undo.DestroyObjectImmediate(meshFilter);
         }
 
-        // Check if it's a DAE file and configure import settings
+        // Check if it's a model file and configure import settings
         string prefabPath = AssetDatabase.GetAssetPath(characterPrefab);
-        if (prefabPath.EndsWith(".dae"))
+        string avatarModelPath = GetModelPathFromPrefab(prefabPath);
+        string avatarSourcePath = string.IsNullOrEmpty(avatarModelPath) ? prefabPath : avatarModelPath;
+
+        if (avatarSourcePath.EndsWith(".dae"))
         {
-            ConfigureCharacterModel(prefabPath);
-            ExtractMaterialsFromModel(prefabPath);
+            ConfigureCharacterModel(avatarSourcePath);
+            ExtractMaterialsFromModel(avatarSourcePath);
         }
 
         // Instantiate character as child
@@ -325,10 +380,10 @@ public class ThirdPersonSetup : EditorWindow
         }
 
         // Setup avatar (required for humanoid animations)
-        SetupAvatar(animator, prefabPath);
+        SetupAvatar(animator, avatarSourcePath);
 
         // Setup animation controller
-        SetupAnimatorController(animator, prefabPath);
+        SetupAnimatorController(animator, prefabPath, avatarSourcePath);
 
         // CRITICAL: Disable root motion AFTER controller is assigned (prevents character from moving with animation)
         // Must be done after controller assignment or it gets reset
@@ -1000,7 +1055,7 @@ public class ThirdPersonSetup : EditorWindow
         }
     }
 
-    private static void SetupAnimatorController(Animator animator, string characterPath)
+    private static void SetupAnimatorController(Animator animator, string characterPath, string avatarSourcePath)
     {
         Debug.Log("=== SETTING UP ANIMATOR CONTROLLER ===");
 
@@ -1023,8 +1078,9 @@ public class ThirdPersonSetup : EditorWindow
         }
 
         // Configure all animations in subdirectories
-        ConfigureAnimation(characterDir, "Idle");
-        ConfigureAnimation(characterDir, "Animations/Walking");
+        ConfigureAnimation(characterDir, "Idle", avatarSourcePath);
+        ConfigureAnimation(characterDir, "Animations/Walking", avatarSourcePath);
+        ConfigureAnimation(characterDir, "Jump", avatarSourcePath);
 
         // Find and add all animation clips
         var stateMachine = controller.layers[0].stateMachine;
@@ -1039,40 +1095,17 @@ public class ThirdPersonSetup : EditorWindow
             Path.Combine(characterDir, "Animations").Replace("\\", "/")
         };
 
-        foreach (string searchDir in searchDirs)
+        AddAnimationsFromDirs(animations, searchDirs);
+
+        if (animations.Count == 0)
         {
-            if (AssetDatabase.IsValidFolder(searchDir))
+            string[] fallbackDirs = new string[]
             {
-                string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { searchDir });
-
-                foreach (string guid in animGuids)
-                {
-                    string animPath = AssetDatabase.GUIDToAssetPath(guid);
-                    AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(animPath);
-
-                    if (clip != null)
-                    {
-                        string fileName = Path.GetFileNameWithoutExtension(Path.GetDirectoryName(animPath));
-                        if (fileName == "Idle" || fileName == "Animations")
-                        {
-                            fileName = Path.GetFileNameWithoutExtension(animPath);
-                        }
-
-                        // Determine animation name based on file location
-                        string animName = fileName;
-                        if (animPath.Contains("Idle"))
-                            animName = "Idle";
-                        else if (animPath.Contains("Walking"))
-                            animName = "Walk";
-
-                        if (!animations.ContainsKey(animName))
-                        {
-                            animations[animName] = clip;
-                            Debug.Log($"Found {animName} animation: {clip.name}");
-                        }
-                    }
-                }
-            }
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump"
+            };
+            AddAnimationsFromDirs(animations, fallbackDirs);
         }
 
         // Add Speed parameter for movement
@@ -1082,9 +1115,18 @@ public class ThirdPersonSetup : EditorWindow
             Debug.Log("Added Speed parameter");
         }
 
+        if (System.Array.Find(controller.parameters, p => p.name == "IsGrounded") == null)
+        {
+            controller.AddParameter("IsGrounded", UnityEngine.AnimatorControllerParameterType.Bool);
+        }
+
         // Create or update animation states
         UnityEditor.Animations.AnimatorState idleState = null;
         UnityEditor.Animations.AnimatorState walkState = null;
+        UnityEditor.Animations.AnimatorState jumpBeginState = null;
+        UnityEditor.Animations.AnimatorState jumpLoopState = null;
+        UnityEditor.Animations.AnimatorState jumpFallState = null;
+        UnityEditor.Animations.AnimatorState jumpLandState = null;
 
         // Create Idle state
         if (animations.ContainsKey("Idle"))
@@ -1098,6 +1140,49 @@ public class ThirdPersonSetup : EditorWindow
         {
             walkState = GetOrCreateState(stateMachine, "Walk", animations["Walk"]);
         }
+
+        string[] idleClipPaths = new string[]
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle02.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Idles/HumanM@Idle01-Idle02.fbx"
+        };
+
+        string[] walkClipPaths = new string[]
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx"
+        };
+
+        ConfigureAnimationFiles(idleClipPaths, avatarSourcePath);
+        ConfigureAnimationFiles(walkClipPaths, avatarSourcePath);
+
+        EnsureStateMotion(idleState, idleClipPaths);
+        EnsureStateMotion(walkState, walkClipPaths);
+
+        // Create Jump states
+        if (animations.ContainsKey("JumpBegin"))
+        {
+            jumpBeginState = GetOrCreateState(stateMachine, "JumpBegin", animations["JumpBegin"]);
+        }
+        if (animations.ContainsKey("JumpLoop"))
+        {
+            jumpLoopState = GetOrCreateState(stateMachine, "JumpLoop", animations["JumpLoop"]);
+        }
+        if (animations.ContainsKey("JumpFall"))
+        {
+            jumpFallState = GetOrCreateState(stateMachine, "JumpFall", animations["JumpFall"]);
+        }
+        if (animations.ContainsKey("JumpLand"))
+        {
+            jumpLandState = GetOrCreateState(stateMachine, "JumpLand", animations["JumpLand"]);
+        }
+
+        string[] jumpLoopClipPaths = new string[]
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01.fbx"
+        };
+        ConfigureAnimationFiles(jumpLoopClipPaths, avatarSourcePath);
+        EnsureStateMotion(jumpLoopState, jumpLoopClipPaths);
 
         // Setup transitions if both states exist
         if (idleState != null && walkState != null)
@@ -1117,9 +1202,24 @@ public class ThirdPersonSetup : EditorWindow
             {
                 var idleToWalk = idleState.AddTransition(walkState);
                 idleToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, 0.1f, "Speed");
+                idleToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
                 idleToWalk.hasExitTime = false;
                 idleToWalk.duration = 0.25f;
                 Debug.Log("Created Idle -> Walk transition");
+            }
+            else
+            {
+                foreach (var transition in idleState.transitions)
+                {
+                    if (transition.destinationState == walkState)
+                    {
+                        bool hasGrounded = System.Array.Exists(transition.conditions, c => c.parameter == "IsGrounded");
+                        if (!hasGrounded)
+                        {
+                            transition.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                        }
+                    }
+                }
             }
 
             // Walk to Idle transition
@@ -1137,9 +1237,233 @@ public class ThirdPersonSetup : EditorWindow
             {
                 var walkToIdle = walkState.AddTransition(idleState);
                 walkToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, 0.1f, "Speed");
+                walkToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
                 walkToIdle.hasExitTime = false;
                 walkToIdle.duration = 0.25f;
                 Debug.Log("Created Walk -> Idle transition");
+            }
+            else
+            {
+                foreach (var transition in walkState.transitions)
+                {
+                    if (transition.destinationState == idleState)
+                    {
+                        bool hasGrounded = System.Array.Exists(transition.conditions, c => c.parameter == "IsGrounded");
+                        if (!hasGrounded)
+                        {
+                            transition.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                        }
+                    }
+                }
+            }
+        }
+
+        EnforceGroundedOnLocomotion(stateMachine, idleState, walkState);
+
+        if (jumpBeginState != null || jumpLoopState != null || jumpFallState != null || jumpLandState != null)
+        {
+            if (System.Array.Find(controller.parameters, p => p.name == "Jump") == null)
+            {
+                controller.AddParameter("Jump", UnityEngine.AnimatorControllerParameterType.Trigger);
+            }
+
+            if (System.Array.Find(controller.parameters, p => p.name == "VerticalVelocity") == null)
+            {
+                controller.AddParameter("VerticalVelocity", UnityEngine.AnimatorControllerParameterType.Float);
+            }
+
+            var jumpEntryState = jumpBeginState ?? jumpLoopState ?? jumpFallState ?? jumpLandState;
+
+            bool hasAnyStateJump = false;
+            foreach (var transition in stateMachine.anyStateTransitions)
+            {
+                if (transition.destinationState == jumpEntryState)
+                {
+                    hasAnyStateJump = true;
+                    break;
+                }
+            }
+
+            if (!hasAnyStateJump)
+            {
+                var anyToJump = stateMachine.AddAnyStateTransition(jumpEntryState);
+                anyToJump.hasExitTime = false;
+                anyToJump.duration = 0.05f;
+                anyToJump.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "Jump");
+                Debug.Log("Created Any State -> Jump transition");
+            }
+
+            if (jumpBeginState != null && jumpLoopState != null)
+            {
+                bool hasBeginToLoop = false;
+                foreach (var transition in jumpBeginState.transitions)
+                {
+                    if (transition.destinationState == jumpLoopState)
+                    {
+                        hasBeginToLoop = true;
+                        break;
+                    }
+                }
+
+                if (!hasBeginToLoop)
+                {
+                    var beginToLoop = jumpBeginState.AddTransition(jumpLoopState);
+                    beginToLoop.hasExitTime = true;
+                    beginToLoop.exitTime = 0.9f;
+                    beginToLoop.duration = 0.05f;
+                }
+            }
+
+            if (jumpBeginState != null && jumpFallState != null)
+            {
+                bool hasBeginToFall = false;
+                foreach (var transition in jumpBeginState.transitions)
+                {
+                    if (transition.destinationState == jumpFallState)
+                    {
+                        hasBeginToFall = true;
+                        break;
+                    }
+                }
+
+                if (!hasBeginToFall)
+                {
+                    var beginToFall = jumpBeginState.AddTransition(jumpFallState);
+                    beginToFall.hasExitTime = false;
+                    beginToFall.duration = 0.05f;
+                    beginToFall.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, -0.1f, "VerticalVelocity");
+                }
+            }
+
+            if (jumpBeginState != null && jumpLandState != null)
+            {
+                bool hasBeginToLand = false;
+                foreach (var transition in jumpBeginState.transitions)
+                {
+                    if (transition.destinationState == jumpLandState)
+                    {
+                        hasBeginToLand = true;
+                        break;
+                    }
+                }
+
+                if (!hasBeginToLand)
+                {
+                    var beginToLand = jumpBeginState.AddTransition(jumpLandState);
+                    beginToLand.hasExitTime = false;
+                    beginToLand.duration = 0.05f;
+                    beginToLand.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                }
+            }
+
+            if (jumpLoopState != null && jumpFallState != null)
+            {
+                bool hasLoopToFall = false;
+                foreach (var transition in jumpLoopState.transitions)
+                {
+                    if (transition.destinationState == jumpFallState)
+                    {
+                        hasLoopToFall = true;
+                        break;
+                    }
+                }
+
+                if (!hasLoopToFall)
+                {
+                    var loopToFall = jumpLoopState.AddTransition(jumpFallState);
+                    loopToFall.hasExitTime = false;
+                    loopToFall.duration = 0.05f;
+                    loopToFall.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, -0.1f, "VerticalVelocity");
+                }
+            }
+
+            if (jumpLoopState != null && jumpLandState != null)
+            {
+                bool hasLoopToLand = false;
+                foreach (var transition in jumpLoopState.transitions)
+                {
+                    if (transition.destinationState == jumpLandState)
+                    {
+                        hasLoopToLand = true;
+                        break;
+                    }
+                }
+
+                if (!hasLoopToLand)
+                {
+                    var loopToLand = jumpLoopState.AddTransition(jumpLandState);
+                    loopToLand.hasExitTime = false;
+                    loopToLand.duration = 0.05f;
+                    loopToLand.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                }
+            }
+
+            if (jumpFallState != null && jumpLandState != null)
+            {
+                bool hasFallToLand = false;
+                foreach (var transition in jumpFallState.transitions)
+                {
+                    if (transition.destinationState == jumpLandState)
+                    {
+                        hasFallToLand = true;
+                        break;
+                    }
+                }
+
+                if (!hasFallToLand)
+                {
+                    var fallToLand = jumpFallState.AddTransition(jumpLandState);
+                    fallToLand.hasExitTime = false;
+                    fallToLand.duration = 0.05f;
+                    fallToLand.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                }
+            }
+
+            if (jumpLandState != null)
+            {
+                if (idleState != null)
+                {
+                    bool hasLandToIdle = false;
+                    foreach (var transition in jumpLandState.transitions)
+                    {
+                        if (transition.destinationState == idleState)
+                        {
+                            hasLandToIdle = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasLandToIdle)
+                    {
+                        var landToIdle = jumpLandState.AddTransition(idleState);
+                        landToIdle.hasExitTime = true;
+                        landToIdle.exitTime = 0.9f;
+                        landToIdle.duration = 0.1f;
+                        landToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, 0.1f, "Speed");
+                    }
+                }
+
+                if (walkState != null)
+                {
+                    bool hasLandToWalk = false;
+                    foreach (var transition in jumpLandState.transitions)
+                    {
+                        if (transition.destinationState == walkState)
+                        {
+                            hasLandToWalk = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasLandToWalk)
+                    {
+                        var landToWalk = jumpLandState.AddTransition(walkState);
+                        landToWalk.hasExitTime = true;
+                        landToWalk.exitTime = 0.9f;
+                        landToWalk.duration = 0.1f;
+                        landToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, 0.1f, "Speed");
+                    }
+                }
             }
         }
 
@@ -1149,6 +1473,61 @@ public class ThirdPersonSetup : EditorWindow
         // Assign controller to animator
         animator.runtimeAnimatorController = controller;
         Debug.Log("Assigned animator controller to character");
+    }
+
+    private static void EnforceGroundedOnLocomotion(UnityEditor.Animations.AnimatorStateMachine stateMachine,
+        UnityEditor.Animations.AnimatorState idleState,
+        UnityEditor.Animations.AnimatorState walkState)
+    {
+        if (idleState == null && walkState == null)
+        {
+            return;
+        }
+
+        if (stateMachine != null)
+        {
+            foreach (var transition in stateMachine.anyStateTransitions)
+            {
+                if (transition.destinationState == idleState || transition.destinationState == walkState)
+                {
+                    bool hasGrounded = System.Array.Exists(transition.conditions, c => c.parameter == "IsGrounded");
+                    if (!hasGrounded)
+                    {
+                        transition.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                    }
+                }
+            }
+        }
+
+        if (idleState != null)
+        {
+            foreach (var transition in idleState.transitions)
+            {
+                if (transition.destinationState == walkState)
+                {
+                    bool hasGrounded = System.Array.Exists(transition.conditions, c => c.parameter == "IsGrounded");
+                    if (!hasGrounded)
+                    {
+                        transition.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                    }
+                }
+            }
+        }
+
+        if (walkState != null)
+        {
+            foreach (var transition in walkState.transitions)
+            {
+                if (transition.destinationState == idleState)
+                {
+                    bool hasGrounded = System.Array.Exists(transition.conditions, c => c.parameter == "IsGrounded");
+                    if (!hasGrounded)
+                    {
+                        transition.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, "IsGrounded");
+                    }
+                }
+            }
+        }
     }
 
     private static UnityEditor.Animations.AnimatorState GetOrCreateState(UnityEditor.Animations.AnimatorStateMachine stateMachine, string stateName, AnimationClip clip)
@@ -1171,7 +1550,42 @@ public class ThirdPersonSetup : EditorWindow
         return newState;
     }
 
-    private static void ConfigureAnimation(string characterDir, string animPath)
+    private static void EnsureStateMotion(UnityEditor.Animations.AnimatorState state, string[] clipPaths)
+    {
+        if (state == null || state.motion != null)
+        {
+            return;
+        }
+
+        foreach (string clipPath in clipPaths)
+        {
+            AnimationClip clip = LoadFirstClip(clipPath);
+            if (clip != null)
+            {
+                state.motion = clip;
+                Debug.Log($"Assigned clip {clip.name} to state {state.name}");
+                return;
+            }
+        }
+    }
+
+    private static void ConfigureAnimationFiles(string[] clipPaths, string avatarSourcePath)
+    {
+        if (clipPaths == null)
+        {
+            return;
+        }
+
+        foreach (string clipPath in clipPaths)
+        {
+            if (!string.IsNullOrEmpty(clipPath))
+            {
+                ConfigureAnimationFile(clipPath, avatarSourcePath);
+            }
+        }
+    }
+
+    private static void ConfigureAnimation(string characterDir, string animPath, string avatarSourcePath)
     {
         string fullPath = Path.Combine(characterDir, animPath).Replace("\\", "/");
 
@@ -1185,7 +1599,7 @@ public class ThirdPersonSetup : EditorWindow
                 string filePath = AssetDatabase.GUIDToAssetPath(guid);
                 if (filePath.EndsWith(".dae") || filePath.EndsWith(".fbx"))
                 {
-                    ConfigureAnimationFile(filePath, characterDir);
+                    ConfigureAnimationFile(filePath, avatarSourcePath);
                 }
             }
         }
@@ -1201,14 +1615,51 @@ public class ThirdPersonSetup : EditorWindow
                     string filePath = AssetDatabase.GUIDToAssetPath(guid);
                     if (filePath.EndsWith(".dae") || filePath.EndsWith(".fbx"))
                     {
-                        ConfigureAnimationFile(filePath, characterDir);
+                        ConfigureAnimationFile(filePath, avatarSourcePath);
                     }
                 }
             }
         }
     }
 
-    private static void ConfigureAnimationFile(string animFilePath, string characterDir)
+    private static void ConfigureAnimationPath(string fullPath, string avatarSourcePath)
+    {
+        if (string.IsNullOrEmpty(fullPath))
+        {
+            return;
+        }
+
+        if (AssetDatabase.IsValidFolder(fullPath))
+        {
+            string[] files = AssetDatabase.FindAssets("t:Model", new[] { fullPath });
+            foreach (string guid in files)
+            {
+                string filePath = AssetDatabase.GUIDToAssetPath(guid);
+                if (filePath.EndsWith(".dae") || filePath.EndsWith(".fbx"))
+                {
+                    ConfigureAnimationFile(filePath, avatarSourcePath);
+                }
+            }
+        }
+        else
+        {
+            string dir = Path.GetDirectoryName(fullPath)?.Replace("\\", "/");
+            if (!string.IsNullOrEmpty(dir) && AssetDatabase.IsValidFolder(dir))
+            {
+                string[] files = AssetDatabase.FindAssets("t:Model", new[] { dir });
+                foreach (string guid in files)
+                {
+                    string filePath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (filePath.EndsWith(".dae") || filePath.EndsWith(".fbx"))
+                    {
+                        ConfigureAnimationFile(filePath, avatarSourcePath);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void ConfigureAnimationFile(string animFilePath, string avatarSourcePath)
     {
         Debug.Log($"Configuring animation file: {animFilePath}");
 
@@ -1217,18 +1668,7 @@ public class ThirdPersonSetup : EditorWindow
 
         bool needsReimport = false;
 
-        // Find character model for avatar
-        string[] characterFiles = AssetDatabase.FindAssets("leonard", new[] { characterDir });
-        string characterModelPath = null;
-        foreach (string guid in characterFiles)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            if ((path.EndsWith(".dae") || path.EndsWith(".fbx")) && !path.Contains("Idle") && !path.Contains("Walking") && !path.Contains("Animations"))
-            {
-                characterModelPath = path;
-                break;
-            }
-        }
+        string characterModelPath = avatarSourcePath;
 
         // Configure animation type
         if (animImporter.animationType != ModelImporterAnimationType.Human)
@@ -1281,7 +1721,17 @@ public class ThirdPersonSetup : EditorWindow
         {
             for (int i = 0; i < clipAnimations.Length; i++)
             {
-                clipAnimations[i].loopTime = true;
+                string clipNameLower = clipAnimations[i].name.ToLower();
+                string pathLower = animFilePath.ToLower();
+                bool isJumpBegin = clipNameLower.Contains("begin") || pathLower.Contains("begin");
+                bool isJumpLand = clipNameLower.Contains("land") || pathLower.Contains("land");
+                bool isJumpFall = clipNameLower.Contains("fall") || pathLower.Contains("fall");
+
+                clipAnimations[i].loopTime = !isJumpBegin && !isJumpLand;
+                if (isJumpFall)
+                {
+                    clipAnimations[i].loopTime = true;
+                }
                 clipAnimations[i].lockRootRotation = true;
                 clipAnimations[i].lockRootHeightY = true;
                 clipAnimations[i].lockRootPositionXZ = false;
@@ -1298,6 +1748,209 @@ public class ThirdPersonSetup : EditorWindow
             animImporter.SaveAndReimport();
             Debug.Log($"Configured animation: {Path.GetFileName(animFilePath)}");
         }
+    }
+
+    private static void AddAnimationsFromDirs(System.Collections.Generic.Dictionary<string, AnimationClip> animations, string[] searchDirs)
+    {
+        foreach (string searchDir in searchDirs)
+        {
+            if (!AssetDatabase.IsValidFolder(searchDir))
+            {
+                continue;
+            }
+
+            string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { searchDir });
+
+            AnimationClip bestWalkClip = null;
+            int bestWalkScore = int.MinValue;
+            AnimationClip bestJumpBeginClip = null;
+            int bestJumpBeginScore = int.MinValue;
+            AnimationClip bestJumpLoopClip = null;
+            int bestJumpLoopScore = int.MinValue;
+            AnimationClip bestJumpFallClip = null;
+            int bestJumpFallScore = int.MinValue;
+            AnimationClip bestJumpLandClip = null;
+            int bestJumpLandScore = int.MinValue;
+
+            foreach (string guid in animGuids)
+            {
+                string animPath = AssetDatabase.GUIDToAssetPath(guid);
+                AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(animPath);
+
+                if (clip == null)
+                {
+                    continue;
+                }
+
+                string animPathLower = animPath.ToLower();
+                string animName = null;
+
+                if (animPathLower.Contains("idle"))
+                {
+                    animName = "Idle";
+                }
+                else if (animPathLower.Contains("walk"))
+                {
+                    animName = "Walk";
+                }
+                else if (animPathLower.Contains("jump") || animPathLower.Contains("fall"))
+                {
+                    animName = "Jump";
+                }
+
+                if (animName == "Walk")
+                {
+                    int score = 0;
+                    if (animPathLower.Contains("walk01_forward"))
+                    {
+                        score += 10;
+                    }
+                    if (animPathLower.Contains("forward"))
+                    {
+                        score += 5;
+                    }
+                    if (animPathLower.Contains("rootmotion") || animPathLower.Contains("[rm]"))
+                    {
+                        score -= 10;
+                    }
+
+                    if (score > bestWalkScore)
+                    {
+                        bestWalkScore = score;
+                        bestWalkClip = clip;
+                    }
+                }
+                else if (animName == "Jump")
+                {
+                    bool isRootMotion = animPathLower.Contains("rootmotion") || animPathLower.Contains("[rm]");
+                    int baseScore = isRootMotion ? -10 : 0;
+
+                    if (animPathLower.Contains("fall"))
+                    {
+                        int score = baseScore + 5;
+                        if (score > bestJumpFallScore)
+                        {
+                            bestJumpFallScore = score;
+                            bestJumpFallClip = clip;
+                        }
+                    }
+                    else if (animPathLower.Contains("land"))
+                    {
+                        int score = baseScore + 5;
+                        if (score > bestJumpLandScore)
+                        {
+                            bestJumpLandScore = score;
+                            bestJumpLandClip = clip;
+                        }
+                    }
+                    else if (animPathLower.Contains("begin"))
+                    {
+                        int score = baseScore + 5;
+                        if (score > bestJumpBeginScore)
+                        {
+                            bestJumpBeginScore = score;
+                            bestJumpBeginClip = clip;
+                        }
+                    }
+                    else
+                    {
+                        int score = baseScore + 10;
+                        if (animPathLower.Contains("jump01"))
+                        {
+                            score += 5;
+                        }
+
+                        if (score > bestJumpLoopScore)
+                        {
+                            bestJumpLoopScore = score;
+                            bestJumpLoopClip = clip;
+                        }
+                    }
+                }
+                else if (animName == "Idle" && !animations.ContainsKey(animName))
+                {
+                    animations[animName] = clip;
+                    Debug.Log($"Found {animName} animation: {clip.name}");
+                }
+            }
+
+            if (bestWalkClip != null && !animations.ContainsKey("Walk"))
+            {
+                animations["Walk"] = bestWalkClip;
+                Debug.Log($"Found Walk animation (preferred): {bestWalkClip.name}");
+            }
+
+            if (bestJumpBeginClip != null && !animations.ContainsKey("JumpBegin"))
+            {
+                animations["JumpBegin"] = bestJumpBeginClip;
+                Debug.Log($"Found JumpBegin animation: {bestJumpBeginClip.name}");
+            }
+            if (bestJumpLoopClip != null && !animations.ContainsKey("JumpLoop"))
+            {
+                animations["JumpLoop"] = bestJumpLoopClip;
+                Debug.Log($"Found JumpLoop animation: {bestJumpLoopClip.name}");
+            }
+            if (bestJumpFallClip != null && !animations.ContainsKey("JumpFall"))
+            {
+                animations["JumpFall"] = bestJumpFallClip;
+                Debug.Log($"Found JumpFall animation: {bestJumpFallClip.name}");
+            }
+            if (bestJumpLandClip != null && !animations.ContainsKey("JumpLand"))
+            {
+                animations["JumpLand"] = bestJumpLandClip;
+                Debug.Log($"Found JumpLand animation: {bestJumpLandClip.name}");
+            }
+
+        }
+    }
+
+    private static AnimationClip LoadFirstClip(string assetPath)
+    {
+        if (string.IsNullOrEmpty(assetPath))
+        {
+            return null;
+        }
+
+        UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+        foreach (var asset in assets)
+        {
+            if (asset is AnimationClip clip && !clip.name.Contains("__preview__"))
+            {
+                return clip;
+            }
+        }
+
+        return null;
+    }
+
+
+    private static string GetModelPathFromPrefab(string prefabPath)
+    {
+        if (string.IsNullOrEmpty(prefabPath) || !prefabPath.EndsWith(".prefab"))
+        {
+            return null;
+        }
+
+        string[] dependencies = AssetDatabase.GetDependencies(prefabPath, true);
+        string fallback = null;
+
+        foreach (string dependency in dependencies)
+        {
+            if (dependency.EndsWith(".fbx") || dependency.EndsWith(".dae"))
+            {
+                if (dependency.Contains("/Models/"))
+                {
+                    return dependency;
+                }
+
+                if (fallback == null)
+                {
+                    fallback = dependency;
+                }
+            }
+        }
+
+        return fallback;
     }
 
     private static void ExtractMaterialsFromModel(string modelPath)
@@ -1388,7 +2041,8 @@ public class ThirdPersonSetup : EditorWindow
         ConfigureKevinIglesiasAnimations(animBasePath, animationNames);
 
         // Then add them to the animator controller
-        AddSprintToAnimatorController(animBasePath, animationNames);
+        var controller = GetActiveAnimatorController();
+        AddSprintToAnimatorController(controller, animBasePath, animationNames);
     }
 
     private static void ConfigureKevinIglesiasAnimations(string animBasePath, string[] animationNames)
@@ -1481,14 +2135,11 @@ public class ThirdPersonSetup : EditorWindow
         System.Threading.Thread.Sleep(1000);
     }
 
-    private static void AddSprintToAnimatorController(string animBasePath, string[] animationNames)
+    private static void AddSprintToAnimatorController(UnityEditor.Animations.AnimatorController controller, string animBasePath, string[] animationNames)
     {
-        string controllerPath = "Assets/Characters/leonard/CharacterAnimator.controller";
-        UnityEditor.Animations.AnimatorController controller = AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(controllerPath);
-
         if (controller == null)
         {
-            Debug.LogError("Could not find CharacterAnimator.controller!");
+            Debug.LogError("Could not find an active AnimatorController to add sprint animations.");
             return;
         }
 
@@ -1599,6 +2250,26 @@ public class ThirdPersonSetup : EditorWindow
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
         }
+    }
+
+    private static UnityEditor.Animations.AnimatorController GetActiveAnimatorController()
+    {
+        GameObject player = GameObject.Find("Player");
+        if (player != null)
+        {
+            Transform characterModel = player.transform.Find("CharacterModel");
+            if (characterModel != null)
+            {
+                Animator animator = characterModel.GetComponent<Animator>();
+                if (animator != null && animator.runtimeAnimatorController != null)
+                {
+                    return animator.runtimeAnimatorController as UnityEditor.Animations.AnimatorController;
+                }
+            }
+        }
+
+        string fallbackPath = "Assets/Characters/leonard/CharacterAnimator.controller";
+        return AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(fallbackPath);
     }
 
     private static UnityEditor.Animations.AnimatorState GetOrCreateBlendTreeState(

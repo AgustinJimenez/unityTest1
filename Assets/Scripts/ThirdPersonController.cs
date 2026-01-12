@@ -24,6 +24,15 @@ public class ThirdPersonController : MonoBehaviour
     private float currentSpeed;
     private Transform cameraTransform;
     private Animator animator;
+    [SerializeField] private bool enableDebugLogs = true;
+    [SerializeField] private float minJumpAirTime = 1f;
+    private int lastAnimatorStateHash;
+    private float groundCheckDisableUntil;
+    private float groundedSince;
+    private bool jumpLocked;
+    private float lastJumpTime = -10f;
+    private readonly int idleHash = Animator.StringToHash("Idle");
+    private readonly int walkHash = Animator.StringToHash("Walk");
 
     // Direct Input Action references
     private InputAction moveAction;
@@ -37,6 +46,17 @@ public class ThirdPersonController : MonoBehaviour
 
         // Get animator from character model child
         animator = GetComponentInChildren<Animator>();
+
+        if (minJumpAirTime < 0.6f)
+        {
+            minJumpAirTime = 0.6f;
+        }
+
+        if (enableDebugLogs)
+        {
+            Debug.Log($"[{Time.time:F2}] Jump config | minJumpAirTime={minJumpAirTime:F2}");
+            Debug.Log($"[{Time.time:F2}] ThirdPersonController awake | name={gameObject.name} | id={GetInstanceID()}");
+        }
 
         // Get the Input Actions directly
         var playerInput = GetComponent<PlayerInput>();
@@ -75,12 +95,39 @@ public class ThirdPersonController : MonoBehaviour
         {
             animator.applyRootMotion = false;
         }
+
+        if (enableDebugLogs)
+        {
+            LogAnimatorStateChange();
+        }
     }
 
     private void CheckGround()
     {
         Vector3 spherePosition = transform.position - new Vector3(0, controller.height / 2 - controller.radius, 0);
-        isGrounded = Physics.CheckSphere(spherePosition, controller.radius + groundCheckDistance, groundMask);
+        bool groundHit = Physics.CheckSphere(spherePosition, controller.radius + groundCheckDistance, groundMask);
+        bool allowGrounding = Time.time >= groundCheckDisableUntil && velocity.y <= 0.1f;
+        bool wasGrounded = isGrounded;
+        isGrounded = allowGrounding && groundHit;
+
+        if (isGrounded)
+        {
+            if (groundedSince <= 0f)
+            {
+                groundedSince = Time.time;
+            }
+
+            if (Time.time - groundedSince > 0.05f && Time.time - lastJumpTime > minJumpAirTime)
+            {
+                jumpLocked = false;
+            }
+        }
+        else
+        {
+            groundedSince = 0f;
+        }
+
+        // Jump-related log disabled for now; keep other debug logs active.
 
         if (isGrounded && velocity.y < 0)
         {
@@ -135,6 +182,11 @@ public class ThirdPersonController : MonoBehaviour
             float normalizedSpeed = currentSpeed / walkSpeed;
             animator.SetFloat("Speed", normalizedSpeed);
 
+            if (HasParameter(animator, "IsGrounded"))
+            {
+                animator.SetBool("IsGrounded", isGrounded);
+            }
+
             // Set sprint state (if parameter exists)
             if (HasParameter(animator, "IsSprinting"))
             {
@@ -150,6 +202,7 @@ public class ThirdPersonController : MonoBehaviour
             {
                 animator.SetFloat("Vertical", moveInput.y);
             }
+
         }
     }
 
@@ -161,9 +214,56 @@ public class ThirdPersonController : MonoBehaviour
 
     private void HandleJump()
     {
-        if (jumpAction != null && jumpAction.WasPressedThisFrame() && isGrounded)
+        bool groundedStable = groundedSince > 0f && Time.time - groundedSince > 0.05f;
+        if (jumpAction != null && jumpAction.WasPressedThisFrame())
         {
-            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            // Jump-related log disabled for now; keep other debug logs active.
+
+            bool airTimeSatisfied = Time.time - lastJumpTime > minJumpAirTime;
+            if (isGrounded && groundedStable && !jumpLocked && airTimeSatisfied)
+            {
+                velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+                lastJumpTime = Time.time;
+                groundCheckDisableUntil = Time.time + minJumpAirTime;
+                isGrounded = false;
+                jumpLocked = true;
+
+                if (animator != null && HasParameter(animator, "Jump"))
+                {
+                    animator.SetTrigger("Jump");
+                }
+
+                // Jump-related log disabled for now; keep other debug logs active.
+            }
+            // Jump-related log disabled for now; keep other debug logs active.
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (animator != null && HasParameter(animator, "VerticalVelocity"))
+        {
+            animator.SetFloat("VerticalVelocity", velocity.y);
+        }
+    }
+
+
+    private void LogAnimatorStateChange()
+    {
+        if (animator == null) return;
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        int stateHash = stateInfo.fullPathHash;
+        if (stateHash != lastAnimatorStateHash)
+        {
+            lastAnimatorStateHash = stateHash;
+            string clipName = "";
+            AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
+            if (clips.Length > 0 && clips[0].clip != null)
+            {
+                clipName = clips[0].clip.name;
+            }
+
+            Debug.Log($"[{Time.time:F2}] Animator state: {stateInfo.shortNameHash} | clip={clipName} | normalizedTime={stateInfo.normalizedTime:F2} | grounded={isGrounded} | velocityY={velocity.y:F2}");
         }
     }
 

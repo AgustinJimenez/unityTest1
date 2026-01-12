@@ -64,6 +64,10 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
+# Local Python environments / TTS outputs
+.venv*/
+tools/tts_output.wav
+
 # Packed Addressables
 [Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
 
