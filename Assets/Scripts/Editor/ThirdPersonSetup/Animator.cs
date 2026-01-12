@@ -4,6 +4,9 @@ using System.IO;
 
 public partial class ThirdPersonSetup
 {
+    private static readonly System.Collections.Generic.Dictionary<string, string[]> AnimationClipGuidCache =
+        new System.Collections.Generic.Dictionary<string, string[]>();
+
     private static void SetupAnimatorController(Animator animator, string characterPath, string avatarSourcePath)
     {
         Debug.Log("=== SETTING UP ANIMATOR CONTROLLER ===");
@@ -38,18 +41,19 @@ public partial class ThirdPersonSetup
         System.Collections.Generic.Dictionary<string, AnimationClip> animations = new System.Collections.Generic.Dictionary<string, AnimationClip>();
 
         // Search in multiple locations
-        string[] searchDirs = new string[]
+        foreach (string[] searchSet in ThirdPersonSetupConfig.BuildAnimationSearchSets(characterDir))
         {
-            Path.Combine(characterDir, "Idle").Replace("\\", "/"),
-            Path.Combine(characterDir, "Animations").Replace("\\", "/")
-        };
-
-        AddAnimationsFromDirs(animations, searchDirs);
-
-        if (animations.Count == 0)
-        {
-            AddAnimationsFromDirs(animations, ThirdPersonSetupConfig.KevinFallbackDirs);
+            AddAnimationsFromDirs(animations, searchSet);
         }
+
+        if (!animations.ContainsKey(ThirdPersonSetupConfig.IdleStateName)
+            || !animations.ContainsKey(ThirdPersonSetupConfig.WalkStateName)
+            || !animations.ContainsKey(ThirdPersonSetupConfig.JumpLoopStateName))
+        {
+            TryAddExplicitClips(animations);
+        }
+
+        ValidateAnimatorSetup(controller, animations);
         if (animations.Count == 0)
         {
             ReportWarning("No animation clips found for Idle/Walk/Jump; animator states may be empty.");
@@ -682,10 +686,12 @@ public partial class ThirdPersonSetup
                 continue;
             }
 
-            string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { searchDir });
+            string[] animGuids = GetAnimationClipGuids(searchDir);
 
             AnimationClip bestWalkClip = null;
             int bestWalkScore = int.MinValue;
+            AnimationClip bestIdleClip = null;
+            int bestIdleScore = int.MinValue;
             AnimationClip bestJumpBeginClip = null;
             int bestJumpBeginScore = int.MinValue;
             AnimationClip bestJumpLoopClip = null;
@@ -790,11 +796,39 @@ public partial class ThirdPersonSetup
                         }
                     }
                 }
-                else if (animName == "Idle" && !animations.ContainsKey(animName))
+                else if (animName == "Idle")
                 {
-                    animations[animName] = clip;
-                    Debug.Log($"Found {animName} animation: {clip.name}");
+                    int score = 0;
+                    bool isBlend = animPathLower.Contains("idle01-idle02") || animPathLower.Contains("idle02-idle01");
+
+                    if (isBlend)
+                    {
+                        score -= 10;
+                    }
+                    if (animPathLower.Contains("idle01"))
+                    {
+                        score += 5;
+                    }
+                    if (animPathLower.Contains("idle02"))
+                    {
+                        score += 3;
+                    }
+                    if (animPathLower.Contains("rootmotion") || animPathLower.Contains("[rm]"))
+                    {
+                        score -= 5;
+                    }
+
+                    if (score > bestIdleScore)
+                    {
+                        bestIdleScore = score;
+                        bestIdleClip = clip;
+                    }
                 }
+            }
+
+            if (bestIdleClip != null)
+            {
+                ApplyIdleCandidate(animations, bestIdleClip, bestIdleScore);
             }
 
             if (bestWalkClip != null && !animations.ContainsKey("Walk"))
@@ -843,5 +877,111 @@ public partial class ThirdPersonSetup
         }
 
         return null;
+    }
+
+    private static void TryAddExplicitClips(System.Collections.Generic.Dictionary<string, AnimationClip> animations)
+    {
+        AnimationClip idleClip = LoadFirstClip(ThirdPersonSetupConfig.KevinIdleClipPaths[0]);
+        AnimationClip walkClip = LoadFirstClip(ThirdPersonSetupConfig.KevinWalkClipPaths[0]);
+        AnimationClip jumpLoopClip = LoadFirstClip(ThirdPersonSetupConfig.KevinJumpLoopClipPaths[0]);
+
+        if (idleClip != null)
+        {
+            ApplyIdleCandidate(animations, idleClip, ScoreIdleClip(idleClip.name.ToLower()));
+        }
+
+        if (walkClip != null && !animations.ContainsKey(ThirdPersonSetupConfig.WalkStateName))
+        {
+            animations[ThirdPersonSetupConfig.WalkStateName] = walkClip;
+        }
+
+        if (jumpLoopClip != null && !animations.ContainsKey(ThirdPersonSetupConfig.JumpLoopStateName))
+        {
+            animations[ThirdPersonSetupConfig.JumpLoopStateName] = jumpLoopClip;
+        }
+    }
+
+    private static void ValidateAnimatorSetup(UnityEditor.Animations.AnimatorController controller,
+        System.Collections.Generic.Dictionary<string, AnimationClip> animations)
+    {
+        if (controller == null)
+        {
+            ReportError("Animator controller not found; animation setup may be incomplete.");
+            return;
+        }
+
+        if (!animations.ContainsKey(ThirdPersonSetupConfig.IdleStateName))
+        {
+            ReportWarning("Idle animation clip not found.");
+        }
+
+        if (!animations.ContainsKey(ThirdPersonSetupConfig.WalkStateName))
+        {
+            ReportWarning("Walk animation clip not found.");
+        }
+
+        if (!animations.ContainsKey(ThirdPersonSetupConfig.JumpLoopStateName)
+            && !animations.ContainsKey(ThirdPersonSetupConfig.JumpBeginStateName)
+            && !animations.ContainsKey(ThirdPersonSetupConfig.JumpFallStateName)
+            && !animations.ContainsKey(ThirdPersonSetupConfig.JumpLandStateName))
+        {
+            ReportWarning("Jump animation clips not found (begin/loop/fall/land).");
+        }
+    }
+
+    private static string[] GetAnimationClipGuids(string searchDir)
+    {
+        if (AnimationClipGuidCache.TryGetValue(searchDir, out string[] cached))
+        {
+            return cached;
+        }
+
+        string[] animGuids = AssetDatabase.FindAssets("t:AnimationClip", new[] { searchDir });
+        AnimationClipGuidCache[searchDir] = animGuids;
+        return animGuids;
+    }
+
+    private static void ApplyIdleCandidate(System.Collections.Generic.Dictionary<string, AnimationClip> animations,
+        AnimationClip candidate,
+        int candidateScore)
+    {
+        if (!animations.TryGetValue(ThirdPersonSetupConfig.IdleStateName, out AnimationClip existing))
+        {
+            animations[ThirdPersonSetupConfig.IdleStateName] = candidate;
+            Debug.Log($"Found Idle animation (preferred): {candidate.name}");
+            return;
+        }
+
+        int existingScore = ScoreIdleClip(existing.name.ToLower());
+        if (candidateScore > existingScore)
+        {
+            animations[ThirdPersonSetupConfig.IdleStateName] = candidate;
+            Debug.Log($"Updated Idle animation (preferred): {candidate.name}");
+        }
+    }
+
+    private static int ScoreIdleClip(string nameOrPathLower)
+    {
+        int score = 0;
+        bool isBlend = nameOrPathLower.Contains("idle01-idle02") || nameOrPathLower.Contains("idle02-idle01");
+
+        if (isBlend)
+        {
+            score -= 10;
+        }
+        if (nameOrPathLower.Contains("idle01"))
+        {
+            score += 5;
+        }
+        if (nameOrPathLower.Contains("idle02"))
+        {
+            score += 3;
+        }
+        if (nameOrPathLower.Contains("rootmotion") || nameOrPathLower.Contains("[rm]"))
+        {
+            score -= 5;
+        }
+
+        return score;
     }
 }

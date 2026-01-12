@@ -84,4 +84,17 @@ internal static class ThirdPersonSetupConfig
     };
 
     public const string HairDiffuseSearch = "Ch31_1002_Diffuse";
+
+    public static string[][] BuildAnimationSearchSets(string characterDir)
+    {
+        return new[]
+        {
+            new[]
+            {
+                System.IO.Path.Combine(characterDir, "Idle").Replace("\\", "/"),
+                System.IO.Path.Combine(characterDir, "Animations").Replace("\\", "/")
+            },
+            KevinFallbackDirs
+        };
+    }
 }
