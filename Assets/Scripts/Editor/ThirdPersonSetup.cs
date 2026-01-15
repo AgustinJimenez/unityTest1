@@ -68,6 +68,7 @@ public partial class ThirdPersonSetup : EditorWindow
 
         // Step 3: Create Ground
         GameObject ground = CreateGround();
+        CreateRampAndStairs();
 
         // Step 4: Add lighting if missing
         EnsureLighting();
@@ -98,7 +99,7 @@ public partial class ThirdPersonSetup : EditorWindow
         Debug.Log("=== THIRD PERSON SETUP COMPLETE ===");
         Debug.Log($"Created: Player {(characterApplied ? "(with character model)" : "(capsule)")}, Camera, Ground");
         Debug.Log("Press PLAY to test! Controls: WASD=Move, Mouse=Look, Space=Jump, Shift=Sprint");
-        CheckTmpSettingsAsset();
+        EnsureTmpSettingsAsset();
         PrintReportSummary();
     }
 }

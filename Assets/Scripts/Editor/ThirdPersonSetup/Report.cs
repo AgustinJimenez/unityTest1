@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
+using System.Collections.Generic;
 
 internal sealed class ThirdPersonSetupReport
 {
@@ -68,13 +70,58 @@ public partial class ThirdPersonSetup
     private static void ReportError(string message) => Report.AddError(message);
     private static void PrintReportSummary() => Report.PrintSummary();
 
-    private static void CheckTmpSettingsAsset()
+    private static void EnsureTmpSettingsAsset()
     {
         const string tmpSettingsPath = "Assets/TextMesh Pro/Resources/TMP Settings.asset";
-        UnityEngine.Object asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(tmpSettingsPath);
-        if (asset == null)
+        const string defaultFontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";
+        TMP_Settings settingsAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_Settings>(tmpSettingsPath);
+        if (settingsAsset == null)
         {
             ReportWarning("TextMeshPro settings asset missing. Import TMP Essentials or assign TMP Settings in Project Settings.");
+            return;
+        }
+
+        TMP_FontAsset defaultFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(defaultFontPath);
+        if (TMP_Settings.defaultFontAsset == null && defaultFont != null)
+        {
+            TMP_Settings.defaultFontAsset = defaultFont;
+            if (TMP_Settings.fallbackFontAssets == null)
+            {
+                TMP_Settings.fallbackFontAssets = new List<TMP_FontAsset>();
+            }
+
+            UnityEditor.EditorUtility.SetDirty(settingsAsset);
+            UnityEditor.AssetDatabase.SaveAssets();
+            ReportInfo("Assigned TMP default font asset (LiberationSans SDF).");
+        }
+        else if (TMP_Settings.defaultFontAsset == null)
+        {
+            ReportWarning("TMP Settings has no default font asset assigned.");
+        }
+
+        EnsureTmpTextComponents();
+    }
+
+    private static void EnsureTmpTextComponents()
+    {
+        TMPro.TextMeshPro[] texts = UnityEngine.Object.FindObjectsByType<TMPro.TextMeshPro>(UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None);
+        if (texts == null || texts.Length == 0)
+        {
+            return;
+        }
+
+        foreach (TMPro.TextMeshPro text in texts)
+        {
+            if (text == null || text.font != null)
+            {
+                continue;
+            }
+
+            if (TMP_Settings.defaultFontAsset != null)
+            {
+                text.font = TMP_Settings.defaultFontAsset;
+                UnityEditor.EditorUtility.SetDirty(text);
+            }
         }
     }
 }

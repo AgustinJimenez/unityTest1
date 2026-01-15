@@ -220,6 +220,7 @@ public partial class ThirdPersonSetup
                 idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
                 idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
                 idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, -ThirdPersonSetupConfig.TurnInPlaceInputThreshold, ThirdPersonSetupConfig.HorizontalParam);
+                idleToTurnLeft.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, -ThirdPersonSetupConfig.TurnInPlaceInputMax, ThirdPersonSetupConfig.HorizontalParam);
             }
 
             bool hasTurnLeftToIdle = System.Array.Exists(turnLeftState.transitions, t => t.destinationState == idleState);
@@ -227,8 +228,8 @@ public partial class ThirdPersonSetup
             {
                 var turnLeftToIdle = turnLeftState.AddTransition(idleState);
                 turnLeftToIdle.hasExitTime = true;
-                turnLeftToIdle.exitTime = 0.9f;
-                turnLeftToIdle.duration = 0.05f;
+                turnLeftToIdle.exitTime = 0.85f;
+                turnLeftToIdle.duration = 0.15f;
                 turnLeftToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
             }
 
@@ -238,8 +239,9 @@ public partial class ThirdPersonSetup
                 if (!hasTurnLeftToWalk)
                 {
                     var turnLeftToWalk = turnLeftState.AddTransition(walkState);
-                    turnLeftToWalk.hasExitTime = false;
-                    turnLeftToWalk.duration = 0.05f;
+                    turnLeftToWalk.hasExitTime = true;
+                    turnLeftToWalk.exitTime = 0.85f;
+                    turnLeftToWalk.duration = 0.15f;
                     turnLeftToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
                 }
             }
@@ -256,6 +258,7 @@ public partial class ThirdPersonSetup
                 idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
                 idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
                 idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, ThirdPersonSetupConfig.TurnInPlaceInputThreshold, ThirdPersonSetupConfig.HorizontalParam);
+                idleToTurnRight.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Less, ThirdPersonSetupConfig.TurnInPlaceInputMax, ThirdPersonSetupConfig.HorizontalParam);
             }
 
             bool hasTurnRightToIdle = System.Array.Exists(turnRightState.transitions, t => t.destinationState == idleState);
@@ -263,8 +266,8 @@ public partial class ThirdPersonSetup
             {
                 var turnRightToIdle = turnRightState.AddTransition(idleState);
                 turnRightToIdle.hasExitTime = true;
-                turnRightToIdle.exitTime = 0.9f;
-                turnRightToIdle.duration = 0.05f;
+                turnRightToIdle.exitTime = 0.85f;
+                turnRightToIdle.duration = 0.15f;
                 turnRightToIdle.AddCondition(UnityEditor.Animations.AnimatorConditionMode.If, 0f, ThirdPersonSetupConfig.IsGroundedParam);
             }
 
@@ -274,8 +277,9 @@ public partial class ThirdPersonSetup
                 if (!hasTurnRightToWalk)
                 {
                     var turnRightToWalk = turnRightState.AddTransition(walkState);
-                    turnRightToWalk.hasExitTime = false;
-                    turnRightToWalk.duration = 0.05f;
+                    turnRightToWalk.hasExitTime = true;
+                    turnRightToWalk.exitTime = 0.85f;
+                    turnRightToWalk.duration = 0.15f;
                     turnRightToWalk.AddCondition(UnityEditor.Animations.AnimatorConditionMode.Greater, ThirdPersonSetupConfig.TurnInPlaceSpeedThreshold, ThirdPersonSetupConfig.SpeedParam);
                 }
             }

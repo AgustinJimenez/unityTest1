@@ -11,6 +11,8 @@ public class ThirdPersonController : MonoBehaviour
     [SerializeField] private float acceleration = 10f;
     [SerializeField] private bool enableTurnInPlace = true;
     [SerializeField] private float turnInPlaceInputThreshold = 0.2f;
+    [SerializeField] private float turnInPlaceHoldTime = 0.2f;
+    [SerializeField] private float turnInPlaceInputMax = 0.6f;
 
     [Header("Jump")]
     [SerializeField] private float jumpHeight = 2f;
@@ -35,6 +37,7 @@ public class ThirdPersonController : MonoBehaviour
     private float lastJumpTime = -10f;
     private readonly int idleHash = Animator.StringToHash("Idle");
     private readonly int walkHash = Animator.StringToHash("Walk");
+    private float turnInPlaceTimer;
 
     // Direct Input Action references
     private InputAction moveAction;
@@ -152,10 +155,23 @@ public class ThirdPersonController : MonoBehaviour
         forward.Normalize();
         right.Normalize();
 
+        bool horizontalOnly = Mathf.Abs(moveInput.y) < turnInPlaceInputThreshold
+            && Mathf.Abs(moveInput.x) > turnInPlaceInputThreshold
+            && Mathf.Abs(moveInput.x) < turnInPlaceInputMax;
+
+        if (enableTurnInPlace && isGrounded && horizontalOnly)
+        {
+            turnInPlaceTimer += Time.deltaTime;
+        }
+        else
+        {
+            turnInPlaceTimer = 0f;
+        }
+
         bool shouldTurnInPlace = enableTurnInPlace
             && isGrounded
-            && Mathf.Abs(moveInput.y) < turnInPlaceInputThreshold
-            && Mathf.Abs(moveInput.x) > turnInPlaceInputThreshold;
+            && horizontalOnly
+            && turnInPlaceTimer < turnInPlaceHoldTime;
 
         Vector3 desiredMoveDirection = shouldTurnInPlace
             ? right * Mathf.Sign(moveInput.x)

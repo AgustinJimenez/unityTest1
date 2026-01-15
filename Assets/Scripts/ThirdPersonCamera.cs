@@ -14,7 +14,7 @@ public class ThirdPersonCamera : MonoBehaviour
     [SerializeField] private float zoomSpeed = 15f;
 
     [Header("Rotation")]
-    [SerializeField] private float mouseSensitivity = 32f;
+    [SerializeField] private float mouseSensitivity = 180f;
     [SerializeField] private float gamepadSensitivity = 1600f;
     [SerializeField] private float rotationSmoothTime = 0.12f;
     [SerializeField] private float minVerticalAngle = -40f;

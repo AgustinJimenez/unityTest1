@@ -6,7 +6,7 @@ public partial class ThirdPersonSetup
     private static void DescribeDryRunPlan()
     {
         ReportInfo("Would clean up existing Player/Ground and camera scripts.");
-        ReportInfo("Would create Ground, lighting, Player, and camera setup.");
+        ReportInfo("Would create Ground, ramp, stairs, lighting, Player, and camera setup.");
         ReportInfo("Would configure Input actions and CharacterController sizing.");
 
         string dummyPrefab = ThirdPersonSetupConfig.DummyPrefabPath;

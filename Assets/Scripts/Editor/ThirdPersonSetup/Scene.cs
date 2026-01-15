@@ -6,19 +6,10 @@ public partial class ThirdPersonSetup
 {
     private static void CleanupExistingSetup()
     {
-        // Remove existing Player
-        GameObject existingPlayer = GameObject.Find("Player");
-        if (existingPlayer != null)
-        {
-            Undo.DestroyObjectImmediate(existingPlayer);
-        }
-
-        // Remove existing Ground
-        GameObject existingGround = GameObject.Find("Ground");
-        if (existingGround != null)
-        {
-            Undo.DestroyObjectImmediate(existingGround);
-        }
+        DestroyAllByName("Player");
+        DestroyAllByName("Ground");
+        DestroyAllByName("Ramp");
+        DestroyAllByName("Stairs");
 
         // Clean up camera script
         Camera mainCamera = Camera.main;
@@ -28,6 +19,22 @@ public partial class ThirdPersonSetup
             if (existingCameraScript != null)
             {
                 Undo.DestroyObjectImmediate(existingCameraScript);
+            }
+        }
+    }
+
+    private static void DestroyAllByName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return;
+        }
+
+        foreach (GameObject obj in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (obj != null && obj.name == name)
+            {
+                Undo.DestroyObjectImmediate(obj);
             }
         }
     }
@@ -49,6 +56,100 @@ public partial class ThirdPersonSetup
 
         Undo.RegisterCreatedObjectUndo(ground, "Create Ground");
         return ground;
+    }
+
+    private static void CreateRampAndStairs()
+    {
+        GameObject ramp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ramp.name = "Ramp";
+        ramp.transform.position = ThirdPersonSetupConfig.RampPosition;
+        ramp.transform.localScale = ThirdPersonSetupConfig.RampScale;
+        ramp.transform.rotation = Quaternion.Euler(ThirdPersonSetupConfig.RampRotationEuler);
+        ApplyMaterialColor(ramp, ThirdPersonSetupConfig.RampColor);
+        Undo.RegisterCreatedObjectUndo(ramp, "Create Ramp");
+
+        GameObject stairsRoot = new GameObject("Stairs");
+        Undo.RegisterCreatedObjectUndo(stairsRoot, "Create Stairs Root");
+
+        Vector3 stepSize = ThirdPersonSetupConfig.StairStepSize;
+        Vector3 start = ThirdPersonSetupConfig.StairStartPosition;
+
+        var stepFilters = new System.Collections.Generic.List<MeshFilter>();
+
+        for (int i = 0; i < ThirdPersonSetupConfig.StairStepCount; i++)
+        {
+            GameObject step = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            step.name = $"Step_{i + 1}";
+            step.transform.SetParent(stairsRoot.transform);
+            step.transform.localScale = stepSize;
+            step.transform.position = start + new Vector3(0f, stepSize.y * i, stepSize.z * i);
+            ApplyMaterialColor(step, ThirdPersonSetupConfig.StairsColor);
+            Undo.RegisterCreatedObjectUndo(step, "Create Stair Step");
+
+            MeshFilter filter = step.GetComponent<MeshFilter>();
+            if (filter != null)
+            {
+                stepFilters.Add(filter);
+            }
+        }
+
+        BuildStairsMeshCollider(stairsRoot, stepFilters);
+    }
+
+    private static void BuildStairsMeshCollider(GameObject stairsRoot, System.Collections.Generic.List<MeshFilter> stepFilters)
+    {
+        if (stairsRoot == null || stepFilters == null || stepFilters.Count == 0)
+        {
+            return;
+        }
+
+        GameObject meshColliderObject = new GameObject("Stairs_MeshCollider");
+        Undo.RegisterCreatedObjectUndo(meshColliderObject, "Create Stairs Mesh Collider");
+        meshColliderObject.transform.SetParent(stairsRoot.transform);
+        meshColliderObject.transform.localPosition = Vector3.zero;
+        meshColliderObject.transform.localRotation = Quaternion.identity;
+        meshColliderObject.transform.localScale = Vector3.one;
+
+        var combine = new CombineInstance[stepFilters.Count];
+        for (int i = 0; i < stepFilters.Count; i++)
+        {
+            MeshFilter filter = stepFilters[i];
+            if (filter == null || filter.sharedMesh == null)
+            {
+                continue;
+            }
+
+            combine[i].mesh = filter.sharedMesh;
+            combine[i].transform = filter.transform.localToWorldMatrix;
+
+            BoxCollider stepCollider = filter.GetComponent<BoxCollider>();
+            if (stepCollider != null)
+            {
+                stepCollider.enabled = false;
+            }
+        }
+
+        Mesh combined = new Mesh();
+        combined.name = "Stairs_CombinedMesh";
+        combined.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        combined.CombineMeshes(combine, true, true);
+
+        MeshCollider meshCollider = meshColliderObject.AddComponent<MeshCollider>();
+        meshCollider.sharedMesh = combined;
+        meshCollider.convex = false;
+    }
+
+    private static void ApplyMaterialColor(GameObject target, Color color)
+    {
+        Renderer renderer = target.GetComponent<Renderer>();
+        if (renderer == null)
+        {
+            return;
+        }
+
+        Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        mat.color = color;
+        renderer.sharedMaterial = mat;
     }
     private static void EnsureLighting()
     {

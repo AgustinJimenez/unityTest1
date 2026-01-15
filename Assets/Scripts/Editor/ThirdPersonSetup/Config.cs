@@ -3,11 +3,24 @@ internal static class ThirdPersonSetupConfig
     public static readonly UnityEngine.Vector3 PlayerSpawnPosition = new UnityEngine.Vector3(0f, 1f, 0f);
     public static readonly UnityEngine.Vector3 GroundScale = new UnityEngine.Vector3(5f, 1f, 5f);
     public static readonly UnityEngine.Color GroundColor = new UnityEngine.Color(0.5f, 0.6f, 0.5f);
+    public static readonly UnityEngine.Color RampColor = new UnityEngine.Color(0.55f, 0.55f, 0.6f);
+    public static readonly UnityEngine.Color StairsColor = new UnityEngine.Color(0.6f, 0.5f, 0.5f);
     public static readonly UnityEngine.Color PlayerColor = new UnityEngine.Color(0.3f, 0.5f, 0.8f);
+
+    public static readonly UnityEngine.Vector3 RampScale = new UnityEngine.Vector3(4f, 0.5f, 5f);
+    public static readonly UnityEngine.Vector3 RampPosition = new UnityEngine.Vector3(4f, 0.25f, -2f);
+    public static readonly UnityEngine.Vector3 RampRotationEuler = new UnityEngine.Vector3(-20f, 0f, 0f);
+
+    public const int StairStepCount = 6;
+    public static readonly UnityEngine.Vector3 StairStepSize = new UnityEngine.Vector3(2f, 0.25f, 0.6f);
+    public static readonly UnityEngine.Vector3 StairStartPosition = new UnityEngine.Vector3(-4f, 0.125f, -2f);
+    public const float StairRampThickness = 0.1f;
 
     public const float CharacterControllerHeight = 2f;
     public const float CharacterControllerRadius = 0.5f;
     public static readonly UnityEngine.Vector3 CharacterControllerCenter = UnityEngine.Vector3.zero;
+    public const float CharacterControllerSkinWidth = 0.02f;
+    public const float CharacterControllerStepOffset = 0.25f;
 
     public static readonly UnityEngine.Color AmbientLightColor = new UnityEngine.Color(0.7f, 0.7f, 0.7f);
     public const float AmbientIntensity = 1.5f;
@@ -27,6 +40,8 @@ internal static class ThirdPersonSetupConfig
     public const string VerticalParam = "Vertical";
     public const float TurnInPlaceSpeedThreshold = 0.1f;
     public const float TurnInPlaceInputThreshold = 0.2f;
+    public const float TurnInPlaceInputMax = 0.6f;
+    public const bool UseAnimatorFootIk = true;
 
     public const string IdleStateName = "Idle";
     public const string WalkStateName = "Walk";
