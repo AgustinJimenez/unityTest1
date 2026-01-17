@@ -20,7 +20,7 @@ internal static class ThirdPersonSetupConfig
     public const float CharacterControllerRadius = 0.5f;
     public static readonly UnityEngine.Vector3 CharacterControllerCenter = UnityEngine.Vector3.zero;
     public const float CharacterControllerSkinWidth = 0.02f;
-    public const float CharacterControllerStepOffset = 0.25f;
+    public const float CharacterControllerStepOffset = 0.35f;
 
     public static readonly UnityEngine.Color AmbientLightColor = new UnityEngine.Color(0.7f, 0.7f, 0.7f);
     public const float AmbientIntensity = 1.5f;

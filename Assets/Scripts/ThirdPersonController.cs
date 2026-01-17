@@ -109,7 +109,8 @@ public class ThirdPersonController : MonoBehaviour
 
     private void CheckGround()
     {
-        Vector3 spherePosition = transform.position - new Vector3(0, controller.height / 2 - controller.radius, 0);
+        // Account for CharacterController center offset when calculating ground check position
+        Vector3 spherePosition = transform.position + controller.center - new Vector3(0, controller.height / 2 - controller.radius, 0);
         bool groundHit = Physics.CheckSphere(spherePosition, controller.radius + groundCheckDistance, groundMask);
         bool allowGrounding = Time.time >= groundCheckDisableUntil && velocity.y <= 0.1f;
         bool wasGrounded = isGrounded;
@@ -137,6 +138,40 @@ public class ThirdPersonController : MonoBehaviour
         if (isGrounded && velocity.y < 0)
         {
             velocity.y = -2f;
+        }
+
+        // Step down: when grounded, snap character to the ground surface
+        // This helps the character "stick" to stairs and slopes instead of floating
+        if (isGrounded && velocity.y <= 0)
+        {
+            ApplyStepDown();
+        }
+    }
+
+    private void ApplyStepDown()
+    {
+        // Cast from the bottom of the capsule to find the actual ground surface
+        Vector3 capsuleBottom = transform.position + controller.center - Vector3.up * (controller.height / 2 - controller.radius);
+        float rayLength = controller.stepOffset + controller.skinWidth + 0.1f;
+
+        // Use SphereCast to match the capsule's bottom shape
+        if (Physics.SphereCast(capsuleBottom, controller.radius * 0.9f, Vector3.down, out RaycastHit hit, rayLength, groundMask))
+        {
+            // Calculate how far above the ground we are
+            float groundY = hit.point.y;
+            float characterBottomY = transform.position.y;
+            float gap = characterBottomY - groundY;
+
+            // If there's a gap and it's within step-down range, snap down
+            if (gap > 0.02f && gap < controller.stepOffset)
+            {
+                controller.Move(Vector3.down * gap);
+
+                if (enableDebugLogs)
+                {
+                    Debug.Log($"[{Time.time:F2}] Step down: gap={gap:F3}m");
+                }
+            }
         }
     }
 
@@ -295,7 +330,7 @@ public class ThirdPersonController : MonoBehaviour
     {
         if (controller != null)
         {
-            Vector3 spherePosition = transform.position - new Vector3(0, controller.height / 2 - controller.radius, 0);
+            Vector3 spherePosition = transform.position + controller.center - new Vector3(0, controller.height / 2 - controller.radius, 0);
             Gizmos.color = isGrounded ? Color.green : Color.red;
             Gizmos.DrawWireSphere(spherePosition, controller.radius + groundCheckDistance);
         }

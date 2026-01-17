@@ -122,7 +122,10 @@ public partial class ThirdPersonSetup
                 Vector3 localMax = player.transform.InverseTransformPoint(bounds.max);
 
                 float height = Mathf.Abs(localMax.y - localMin.y);
-                float radius = Mathf.Max(Mathf.Abs(localMax.x - localMin.x), Mathf.Abs(localMax.z - localMin.z)) * 0.5f;
+                // Don't use full bounding box width (includes arms) - use a reasonable torso radius
+                // Typical human torso is ~0.3m radius, cap at 0.4m max
+                float boundingRadius = Mathf.Max(Mathf.Abs(localMax.x - localMin.x), Mathf.Abs(localMax.z - localMin.z)) * 0.5f;
+                float radius = Mathf.Min(boundingRadius, 0.3f);
                 Vector3 center = new Vector3(0, height * 0.5f, 0);
 
                 Undo.RecordObject(controller, "Adjust Character Controller");
@@ -719,148 +722,10 @@ public partial class ThirdPersonSetup
             return;
         }
 
-        if (ThirdPersonSetupConfig.UseAnimatorFootIk)
-        {
-            DisableRiggingComponents(characterInstance.transform.root);
-            SetupAnimatorFootIk(animator);
-            ReportInfo("Foot IK using Animator IK (rigging disabled).");
-            return;
-        }
-
-        Transform leftUpperLeg = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
-        Transform leftLowerLeg = animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
-        Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
-        Transform rightUpperLeg = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
-        Transform rightLowerLeg = animator.GetBoneTransform(HumanBodyBones.RightLowerLeg);
-        Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
-
-        if (leftUpperLeg == null || leftLowerLeg == null || leftFoot == null
-            || rightUpperLeg == null || rightLowerLeg == null || rightFoot == null)
-        {
-            ReportWarning("Foot IK skipped: missing humanoid leg bones.");
-            return;
-        }
-
-        GameObject rigHost = animator != null ? animator.gameObject : characterInstance;
-        Transform rootTransform = characterInstance.transform.root;
-        RigBuilder[] existingBuilders = rootTransform.GetComponentsInChildren<RigBuilder>(true);
-        foreach (RigBuilder existingBuilder in existingBuilders)
-        {
-            if (existingBuilder == null || existingBuilder.gameObject == rigHost)
-            {
-                continue;
-            }
-
-            Undo.DestroyObjectImmediate(existingBuilder);
-        }
-
-        RigBuilder rigBuilder = rigHost.GetComponent<RigBuilder>();
-        if (rigBuilder == null)
-        {
-            rigBuilder = Undo.AddComponent<RigBuilder>(rigHost);
-        }
-
-        Transform rigParent = rigHost.transform;
-        Transform rigRoot = rigParent.Find("Rig");
-        if (rigRoot == null)
-        {
-            GameObject rigRootObject = new GameObject("Rig");
-            Undo.RegisterCreatedObjectUndo(rigRootObject, "Create Rig Root");
-            rigRootObject.transform.SetParent(rigParent);
-            rigRootObject.transform.localPosition = Vector3.zero;
-            rigRootObject.transform.localRotation = Quaternion.identity;
-            rigRootObject.transform.localScale = Vector3.one;
-            rigRoot = rigRootObject.transform;
-        }
-
-        Rig rig = rigRoot.GetComponent<Rig>();
-        if (rig == null)
-        {
-            rig = Undo.AddComponent<Rig>(rigRoot.gameObject);
-        }
-        rig.weight = 1f;
-        rig.enabled = true;
-
-        Transform leftConstraintRoot = GetOrCreateChild(rigRoot, "LeftFootIK");
-        Transform rightConstraintRoot = GetOrCreateChild(rigRoot, "RightFootIK");
-
-        Transform leftTarget = GetOrCreateChild(rigRoot, "LeftFootTarget");
-        Transform leftHint = GetOrCreateChild(rigRoot, "LeftFootHint");
-        Transform rightTarget = GetOrCreateChild(rigRoot, "RightFootTarget");
-        Transform rightHint = GetOrCreateChild(rigRoot, "RightFootHint");
-
-        TwoBoneIKConstraint leftConstraint = leftConstraintRoot.GetComponent<TwoBoneIKConstraint>();
-        if (leftConstraint == null)
-        {
-            leftConstraint = Undo.AddComponent<TwoBoneIKConstraint>(leftConstraintRoot.gameObject);
-        }
-        leftConstraint.enabled = true;
-
-        TwoBoneIKConstraint rightConstraint = rightConstraintRoot.GetComponent<TwoBoneIKConstraint>();
-        if (rightConstraint == null)
-        {
-            rightConstraint = Undo.AddComponent<TwoBoneIKConstraint>(rightConstraintRoot.gameObject);
-        }
-        rightConstraint.enabled = true;
-
-        var leftData = leftConstraint.data;
-        leftData.root = leftUpperLeg;
-        leftData.mid = leftLowerLeg;
-        leftData.tip = leftFoot;
-        leftData.target = leftTarget;
-        leftData.hint = leftHint;
-        leftData.targetPositionWeight = 1f;
-        leftData.targetRotationWeight = 0f;
-        leftData.hintWeight = 1f;
-        leftData.maintainTargetPositionOffset = true;
-        leftData.maintainTargetRotationOffset = false;
-        leftConstraint.data = leftData;
-        leftConstraint.weight = 1f;
-
-        var rightData = rightConstraint.data;
-        rightData.root = rightUpperLeg;
-        rightData.mid = rightLowerLeg;
-        rightData.tip = rightFoot;
-        rightData.target = rightTarget;
-        rightData.hint = rightHint;
-        rightData.targetPositionWeight = 1f;
-        rightData.targetRotationWeight = 0f;
-        rightData.hintWeight = 1f;
-        rightData.maintainTargetPositionOffset = true;
-        rightData.maintainTargetRotationOffset = false;
-        rightConstraint.data = rightData;
-        rightConstraint.weight = 1f;
-
-        // Initialize targets and hints to current pose to avoid snapping.
-        leftTarget.position = leftFoot.position;
-        leftTarget.rotation = leftFoot.rotation;
-        rightTarget.position = rightFoot.position;
-        rightTarget.rotation = rightFoot.rotation;
-
-        leftHint.position = leftLowerLeg.position + (characterInstance.transform.forward * 0.2f) + (Vector3.up * 0.1f);
-        rightHint.position = rightLowerLeg.position + (characterInstance.transform.forward * 0.2f) + (Vector3.up * 0.1f);
-
-        ValidateFootIkHierarchy(characterInstance.transform, leftTarget, leftHint, rightTarget, rightHint);
-
-        var layers = new System.Collections.Generic.List<RigLayer>(rigBuilder.layers);
-        bool hasLayer = layers.Exists(layer => layer.rig == rig);
-        if (!hasLayer)
-        {
-            layers.Add(new RigLayer(rig) { active = true });
-            rigBuilder.layers = layers;
-        }
-
-        rigBuilder.enabled = true;
-        rigBuilder.Build();
-
-        FootIkSolver solver = characterInstance.GetComponent<FootIkSolver>();
-        if (solver == null)
-        {
-            solver = Undo.AddComponent<FootIkSolver>(characterInstance);
-        }
-
-        solver.SetTargets(leftTarget, rightTarget, leftHint, rightHint);
-        ReportInfo("Foot IK rig created for stairs/ramps.");
+        // Use Animator IK (simpler, no Animation Rigging package dependency)
+        DisableRiggingComponents(characterInstance.transform.root);
+        SetupAnimatorFootIk(animator);
+        ReportInfo("Foot IK using Animator IK (rigging disabled).");
     }
 
     private static void SetupAnimatorFootIk(Animator animator)

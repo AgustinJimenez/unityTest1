@@ -37,7 +37,50 @@ This repository is a Unity 6 (6000.3.3f1) project using URP and the new Input Sy
 
 ## Editor Tools & Setup
 - `Tools > Third Person > Complete Setup` builds the player/camera/ground and animation wiring.
+- `Tools > Third Person > Dry Run Setup` previews what the setup would do without making changes.
 - Auto-run is enabled on compile by default; toggle via `Tools > Third Person > Auto Run Setup`.
+
+### Complete Setup Script (`ThirdPersonSetup.cs`)
+Location: `Assets/Scripts/Editor/ThirdPersonSetup/`
+
+The Complete Setup script is a multi-file partial class that automates the entire third-person character setup. It consists of:
+
+**Files:**
+- `ThirdPersonSetup.cs` - Main entry point with menu items
+- `Config.cs` - Configuration constants (paths, sizes, animation names)
+- `Scene.cs` - Scene object creation (Ground, Ramp, Stairs, Player, Camera)
+- `Character.cs` - Character model application and material fixes
+- `Animator.cs` - Animator controller setup with states and transitions
+- `Sprint.cs` - Sprint animation blend tree setup
+- `Report.cs` - Setup report logging and TMP settings validation
+- `DryRun.cs` - Dry run mode description
+
+**What it creates:**
+1. **Ground** - 50x50 plane at origin with default material
+2. **Ramp** - Angled surface for testing slope movement
+3. **Stairs** - Step geometry with combined MeshCollider for foot IK testing
+4. **Player** - GameObject with:
+   - `CharacterController` (radius 0.3, height 1.8, center offset 0.9)
+   - `ThirdPersonController` (movement logic)
+   - `PlayerInput` (new Input System)
+   - `CharacterModel` child with Animator and `AnimatorFootIk`
+5. **Camera** - Main Camera with `ThirdPersonCamera` component
+
+**Animator States:**
+- Idle, Walk, TurnLeft, TurnRight (locomotion)
+- JumpBegin, JumpLoop, JumpFall, JumpLand (jump sequence)
+- Sprint (2D blend tree with directional animations)
+
+**Parameters:**
+- `Speed` (float), `Horizontal` (float), `Vertical` (float)
+- `IsGrounded` (bool), `Jump` (trigger)
+- `VerticalVelocity` (float), `IsSprinting` (bool)
+
+**Character Model Priority:**
+1. Kevin Iglesias Human Character Dummy (`Assets/Kevin Iglesias/Human Character Dummy/Prefabs/Human Character Dummy.prefab`)
+2. Fallback: Any FBX in `Assets/Mixamo/character/`
+
+**Note:** The Complete Setup script and MCP Unity are complementary. MCP allows Claude to make targeted modifications, while Complete Setup provides a full reset to a known working state.
 
 ## MCP Unity Integration (Claude Code)
 This project has MCP Unity configured, allowing Claude Code to interact directly with the Unity Editor.

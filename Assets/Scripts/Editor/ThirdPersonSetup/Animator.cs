@@ -34,6 +34,15 @@ public partial class ThirdPersonSetup
         ConfigureAnimation(characterDir, "Animations/Walking", avatarSourcePath);
         ConfigureAnimation(characterDir, "Jump", avatarSourcePath);
 
+        // Enable IK Pass on the base layer for foot IK to work
+        var layers = controller.layers;
+        if (layers.Length > 0 && !layers[0].iKPass)
+        {
+            layers[0].iKPass = true;
+            controller.layers = layers;
+            Debug.Log("Enabled IK Pass on base layer");
+        }
+
         // Find and add all animation clips
         var stateMachine = controller.layers[0].stateMachine;
 
