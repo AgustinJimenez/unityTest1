@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-This repository is a Unity 6 (6000.3.2f1) project using URP and the new Input System.
+This repository is a Unity 6 (6000.3.3f1) project using URP and the new Input System.
 
 ## Project Structure & Module Organization
 - `Assets/` contains all runtime content.
@@ -38,6 +38,31 @@ This repository is a Unity 6 (6000.3.2f1) project using URP and the new Input Sy
 ## Editor Tools & Setup
 - `Tools > Third Person > Complete Setup` builds the player/camera/ground and animation wiring.
 - Auto-run is enabled on compile by default; toggle via `Tools > Third Person > Auto Run Setup`.
+
+## MCP Unity Integration (Claude Code)
+This project has MCP Unity configured, allowing Claude Code to interact directly with the Unity Editor.
+
+### Setup
+- Package: `com.gamelovers.mcp-unity` (installed via git URL in `Packages/manifest.json`)
+- Config: `.mcp.json` in project root points to the MCP server
+- Server runs on port 8090 (WebSocket)
+
+### Usage
+1. Open Unity Editor and ensure the MCP server is running (`Tools > MCP Unity > Server Window`)
+2. Start Claude Code from the project directory
+3. Claude can now use MCP tools to:
+   - Query scene hierarchy and assets
+   - Create/modify GameObjects and components
+   - Manage scenes (create, load, save)
+   - Create and assign materials
+   - Run tests
+   - Send messages to Unity console
+   - Execute menu items
+
+### Troubleshooting
+- If MCP times out, ensure Unity is focused/responsive and the server is running
+- After restarting Unity, you may need to restart Claude Code to reconnect
+- Server build location: `Library/PackageCache/com.gamelovers.mcp-unity@.../Server~/build/index.js`
 
 ## Input & Animation Notes
 - Input actions live in `Assets/InputSystem_Actions.inputactions`; prefer `PlayerInput` action maps.
