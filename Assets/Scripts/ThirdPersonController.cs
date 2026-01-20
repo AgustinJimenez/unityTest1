@@ -213,7 +213,10 @@ public class ThirdPersonController : MonoBehaviour
             : forward * moveInput.y + right * moveInput.x;
 
         // Check if sprinting
-        bool isSprinting = sprintAction != null && sprintAction.IsPressed();
+        bool isSprinting = sprintAction != null
+            && sprintAction.IsPressed()
+            && moveInput.sqrMagnitude > 0.01f
+            && !shouldTurnInPlace;
         float targetSpeed = shouldTurnInPlace ? 0f : (isSprinting ? sprintSpeed : walkSpeed);
 
         // Smoothly accelerate

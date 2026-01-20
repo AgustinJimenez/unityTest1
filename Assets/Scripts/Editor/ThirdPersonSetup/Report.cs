@@ -67,9 +67,9 @@ public partial class ThirdPersonSetup
     private static void ReportInfo(string message) => Report.AddInfo(message);
     private static void ReportWarning(string message) => Report.AddWarning(message);
     private static void ReportError(string message) => Report.AddError(message);
-    private static void PrintReportSummary() => Report.PrintSummary();
+    internal static void PrintReportSummary() => Report.PrintSummary();
 
-    private static void EnsureTmpSettingsAsset()
+    internal static void EnsureTmpSettingsAsset()
     {
         const string tmpSettingsPath = "Assets/TextMesh Pro/Resources/TMP Settings.asset";
         const string defaultFontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";

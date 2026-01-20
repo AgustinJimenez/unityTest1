@@ -3,7 +3,7 @@ using UnityEditor;
 
 public partial class ThirdPersonSetup
 {
-    private static void SetupKevinIglesiasSprint()
+    internal static void SetupKevinIglesiasSprint()
     {
         // Use Sprint animations instead of Run - they might have better retargeting
         string animBasePath = ThirdPersonSetupConfig.SprintRootMotionPath;
@@ -18,7 +18,11 @@ public partial class ThirdPersonSetup
     }
     private static void ConfigureKevinIglesiasAnimations(string animBasePath, string[] animationNames)
     {
-        Debug.Log("Configuring Kevin Iglesias animations to use their own avatars...");
+        string avatarSourcePath = !string.IsNullOrEmpty(LastAvatarSourcePath)
+            ? LastAvatarSourcePath
+            : ThirdPersonSetupConfig.DummyPrefabPath;
+
+        Debug.Log("Configuring Kevin Iglesias animations to copy the character avatar...");
 
         foreach (string animName in animationNames)
         {
@@ -32,71 +36,8 @@ public partial class ThirdPersonSetup
                 continue;
             }
 
-            bool changed = false;
-
-            // Enable animation import
-            if (!importer.importAnimation)
-            {
-                importer.importAnimation = true;
-                changed = true;
-            }
-
-            // Set to Humanoid
-            if (importer.animationType != ModelImporterAnimationType.Human)
-            {
-                importer.animationType = ModelImporterAnimationType.Human;
-                changed = true;
-            }
-
-            // CRITICAL: Create avatar from THIS model, don't copy from leonard
-            if (importer.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
-            {
-                importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
-                changed = true;
-            }
-
-            // Don't import materials
-            if (importer.materialImportMode != ModelImporterMaterialImportMode.None)
-            {
-                importer.materialImportMode = ModelImporterMaterialImportMode.None;
-                changed = true;
-            }
-
-            // Enable higher quality humanoid retargeting
-            if (importer.humanoidOversampling != ModelImporterHumanoidOversampling.X1)
-            {
-                importer.humanoidOversampling = ModelImporterHumanoidOversampling.X1;
-                changed = true;
-            }
-
-            // Configure animation clips for better foot placement
-            ModelImporterClipAnimation[] clips = importer.defaultClipAnimations;
-            if (clips.Length > 0)
-            {
-                ModelImporterClipAnimation clip = clips[0];
-
-                // Critical settings for foot IK
-                clip.loopTime = true;
-                clip.lockRootRotation = true;
-                clip.lockRootHeightY = true;
-                clip.lockRootPositionXZ = false;
-                clip.keepOriginalPositionY = false;
-                clip.keepOriginalPositionXZ = false;
-                clip.heightFromFeet = true;
-
-                // Enable foot IK for better grounding
-                clip.keepOriginalOrientation = false;
-                clip.keepOriginalPositionY = false;
-                clip.keepOriginalPositionXZ = false;
-
-                importer.clipAnimations = new ModelImporterClipAnimation[] { clip };
-                changed = true;
-            }
-
-            if (changed)
-            {
-                importer.SaveAndReimport();
-            }
+            // Use the shared configuration to copy avatar + clip settings
+            ConfigureAnimationFile(animPath, avatarSourcePath);
         }
 
         // CRITICAL: Wait for Unity to finish importing

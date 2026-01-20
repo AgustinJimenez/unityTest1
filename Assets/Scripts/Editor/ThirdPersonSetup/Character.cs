@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEditor;
-using UnityEngine.Animations.Rigging;
 using System.IO;
 
 public partial class ThirdPersonSetup
@@ -12,7 +11,7 @@ public partial class ThirdPersonSetup
     private static readonly System.Collections.Generic.Dictionary<string, bool> AssetExistsCache =
         new System.Collections.Generic.Dictionary<string, bool>();
 
-    private static bool TryApplyCharacterModel(GameObject player)
+    internal static bool TryApplyCharacterModel(GameObject player)
     {
         GameObject characterPrefab = null;
 
@@ -82,6 +81,7 @@ public partial class ThirdPersonSetup
         string prefabPath = AssetDatabase.GetAssetPath(characterPrefab);
         string avatarModelPath = GetModelPathFromPrefab(prefabPath);
         string avatarSourcePath = string.IsNullOrEmpty(avatarModelPath) ? prefabPath : avatarModelPath;
+        LastAvatarSourcePath = avatarSourcePath;
 
         if (avatarSourcePath.EndsWith(".dae") && FileExistsCached(avatarSourcePath))
         {
@@ -159,22 +159,6 @@ public partial class ThirdPersonSetup
         // Must be done after controller assignment or it gets reset
         animator.applyRootMotion = false;
 
-        // Enable IK to help with foot placement issues
-        var animController = animator.runtimeAnimatorController as UnityEditor.Animations.AnimatorController;
-        if (animController != null && animController.layers.Length > 0)
-        {
-            var layer = animController.layers[0];
-            if (!layer.iKPass)
-            {
-                layer.iKPass = true;
-                animController.layers[0] = layer;
-                EditorUtility.SetDirty(animController);
-                AssetDatabase.SaveAssets();
-                Debug.Log("Enabled IK Pass on animator for better foot placement");
-            }
-        }
-
-        SetupFootIk(characterInstance, animator);
         Debug.Log("Disabled Apply Root Motion on Animator");
 
         return true;
@@ -276,7 +260,7 @@ public partial class ThirdPersonSetup
             renderer.sharedMaterials = materials;
         }
     }
-    private static void FixMaterialTextures()
+    internal static void FixMaterialTextures()
     {
         Debug.Log("=== FIXING MATERIAL TEXTURES ===");
 
@@ -715,89 +699,6 @@ public partial class ThirdPersonSetup
         Debug.Log("Applied eyelash material to mesh");
     }
 
-    private static void SetupFootIk(GameObject characterInstance, Animator animator)
-    {
-        if (characterInstance == null || animator == null)
-        {
-            return;
-        }
-
-        // Use Animator IK (simpler, no Animation Rigging package dependency)
-        DisableRiggingComponents(characterInstance.transform.root);
-        SetupAnimatorFootIk(animator);
-        ReportInfo("Foot IK using Animator IK (rigging disabled).");
-    }
-
-    private static void SetupAnimatorFootIk(Animator animator)
-    {
-        if (animator == null)
-        {
-            return;
-        }
-
-        AnimatorFootIk animatorFootIk = animator.GetComponent<AnimatorFootIk>();
-        if (animatorFootIk == null)
-        {
-            animatorFootIk = Undo.AddComponent<AnimatorFootIk>(animator.gameObject);
-        }
-    }
-
-    private static void DisableRiggingComponents(Transform root)
-    {
-        if (root == null)
-        {
-            return;
-        }
-
-        foreach (RigBuilder rigBuilder in root.GetComponentsInChildren<RigBuilder>(true))
-        {
-            Undo.RecordObject(rigBuilder, "Disable RigBuilder");
-            rigBuilder.enabled = false;
-        }
-
-        foreach (Rig rig in root.GetComponentsInChildren<Rig>(true))
-        {
-            Undo.RecordObject(rig, "Disable Rig");
-            rig.weight = 0f;
-            rig.enabled = false;
-        }
-
-        foreach (TwoBoneIKConstraint constraint in root.GetComponentsInChildren<TwoBoneIKConstraint>(true))
-        {
-            Undo.RecordObject(constraint, "Disable Foot IK Constraint");
-            constraint.weight = 0f;
-            constraint.enabled = false;
-        }
-
-        foreach (FootIkSolver solver in root.GetComponentsInChildren<FootIkSolver>(true))
-        {
-            Undo.RecordObject(solver, "Disable Foot IK Solver");
-            solver.enabled = false;
-        }
-    }
-
-    private static void ValidateFootIkHierarchy(Transform characterRoot, params Transform[] rigTransforms)
-    {
-        if (characterRoot == null || rigTransforms == null)
-        {
-            return;
-        }
-
-        foreach (Transform rigTransform in rigTransforms)
-        {
-            if (rigTransform == null)
-            {
-                continue;
-            }
-
-            if (rigTransform.IsChildOf(characterRoot) && rigTransform.parent != null && rigTransform.parent.name == "Rig")
-            {
-                continue;
-            }
-
-            ReportWarning($"Foot IK transform '{rigTransform.name}' should live under Rig root to avoid hierarchy issues.");
-        }
-    }
 
     private static Transform GetOrCreateChild(Transform parent, string name)
     {

@@ -660,10 +660,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3503167532966410781, guid: 9bd72731ebe2248478ba4849c274a43b, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 320579928}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9bd72731ebe2248478ba4849c274a43b, type: 3}
 --- !u!4 &320579926 stripped
 Transform:
@@ -675,30 +672,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3503167532966410781, guid: 9bd72731ebe2248478ba4849c274a43b, type: 3}
   m_PrefabInstance: {fileID: 320579925}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &320579928
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 320579927}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a0548b2385f924846b3baac81c564b41, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AnimatorFootIk
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  raycastDistance: 1
-  footOffset: 0.02
-  hintForwardOffset: 0.2
-  hintUpOffset: 0.1
-  rotateToSurface: 1
-  ikPositionWeight: 1
-  ikRotationWeight: 1
-  hintWeight: 1
-  debug: 1
 --- !u!21 &363382428
 Material:
   serializedVersion: 8

@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 
 public partial class ThirdPersonSetup
 {
-    private static void CleanupExistingSetup()
+    internal static void CleanupExistingSetup()
     {
         DestroyAllByName("Player");
         DestroyAllByName("Ground");
@@ -38,7 +38,7 @@ public partial class ThirdPersonSetup
             }
         }
     }
-    private static GameObject CreateGround()
+    internal static GameObject CreateGround()
     {
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.name = "Ground";
@@ -58,7 +58,7 @@ public partial class ThirdPersonSetup
         return ground;
     }
 
-    private static void CreateRampAndStairs()
+    internal static void CreateRampAndStairs()
     {
         GameObject ramp = GameObject.CreatePrimitive(PrimitiveType.Cube);
         ramp.name = "Ramp";
@@ -151,7 +151,7 @@ public partial class ThirdPersonSetup
         mat.color = color;
         renderer.sharedMaterial = mat;
     }
-    private static void EnsureLighting()
+    internal static void EnsureLighting()
     {
         // Set ambient lighting for better visibility - using Skybox mode with high intensity
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
@@ -194,7 +194,7 @@ public partial class ThirdPersonSetup
             Debug.Log("Created directional light with intensity 3");
         }
     }
-    private static GameObject CreatePlayer()
+    internal static GameObject CreatePlayer()
     {
         // Create capsule
         GameObject player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
@@ -247,7 +247,7 @@ public partial class ThirdPersonSetup
         Undo.RegisterCreatedObjectUndo(player, "Create Player");
         return player;
     }
-    private static void SetupCamera(GameObject player)
+    internal static void SetupCamera(GameObject player)
     {
         Camera mainCamera = Camera.main;
 

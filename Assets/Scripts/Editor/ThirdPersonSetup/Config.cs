@@ -41,7 +41,7 @@ internal static class ThirdPersonSetupConfig
     public const float TurnInPlaceSpeedThreshold = 0.1f;
     public const float TurnInPlaceInputThreshold = 0.2f;
     public const float TurnInPlaceInputMax = 0.6f;
-    public const bool UseAnimatorFootIk = true;
+    public const bool UseAnimatorFootIk = false;
 
     public const string IdleStateName = "Idle";
     public const string WalkStateName = "Walk";
@@ -102,14 +102,14 @@ internal static class ThirdPersonSetupConfig
         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Right.fbx"
     };
 
-    public const string SprintRootMotionPath = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Sprint/RootMotion";
+    public const string SprintRootMotionPath = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run";
     public static readonly string[] SprintAnimationNames =
     {
-        "HumanM@Sprint01_Forward [RM]",
-        "HumanM@Sprint01_ForwardLeft [RM]",
-        "HumanM@Sprint01_ForwardRight [RM]",
-        "HumanM@Sprint01_Left [RM]",
-        "HumanM@Sprint01_Right [RM]"
+        "HumanM@Run01_Forward",
+        "HumanM@Run01_ForwardLeft",
+        "HumanM@Run01_ForwardRight",
+        "HumanM@Run01_Left",
+        "HumanM@Run01_Right"
     };
 
     public const string HairDiffuseSearch = "Ch31_1002_Diffuse";
