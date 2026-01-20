@@ -134,8 +134,15 @@ public partial class ThirdPersonSetup
             jumpLandState = GetOrCreateState(stateMachine, ThirdPersonSetupConfig.JumpLandStateName, animations["JumpLand"]);
         }
 
+        ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinJumpBeginClipPaths, avatarSourcePath);
+        ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinJumpFallClipPaths, avatarSourcePath);
+        ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinJumpLandClipPaths, avatarSourcePath);
         ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinJumpLoopClipPaths, avatarSourcePath);
+
+        EnsureStateMotion(jumpBeginState, ThirdPersonSetupConfig.KevinJumpBeginClipPaths);
         EnsureStateMotion(jumpLoopState, ThirdPersonSetupConfig.KevinJumpLoopClipPaths);
+        EnsureStateMotion(jumpFallState, ThirdPersonSetupConfig.KevinJumpFallClipPaths);
+        EnsureStateMotion(jumpLandState, ThirdPersonSetupConfig.KevinJumpLandClipPaths);
 
         // Setup transitions if both states exist
         if (idleState != null && walkState != null)

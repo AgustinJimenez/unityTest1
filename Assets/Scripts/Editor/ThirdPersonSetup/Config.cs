@@ -92,6 +92,21 @@ internal static class ThirdPersonSetupConfig
         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01.fbx"
     };
 
+    public static readonly string[] KevinJumpBeginClipPaths =
+    {
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx"
+    };
+
+    public static readonly string[] KevinJumpFallClipPaths =
+    {
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx"
+    };
+
+    public static readonly string[] KevinJumpLandClipPaths =
+    {
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Land.fbx"
+    };
+
     public static readonly string[] KevinTurnLeftClipPaths =
     {
         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Left.fbx"
