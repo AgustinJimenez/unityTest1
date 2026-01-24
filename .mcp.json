@@ -3,7 +3,7 @@
     "mcp-unity": {
       "command": "node",
       "args": [
-        "/Users/agusj/repo/unityTest1/Library/PackageCache/com.gamelovers.mcp-unity@5dbd851fc51a/Server~/build/index.js"
+        "/Users/agusj/repo/unity/unityTest1/Library/PackageCache/com.gamelovers.mcp-unity@5dbd851fc51a/Server~/build/index.js"
       ]
     }
   }

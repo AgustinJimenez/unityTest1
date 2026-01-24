@@ -110,6 +110,9 @@ This project has MCP Unity configured, allowing Claude Code to interact directly
 ## Input & Animation Notes
 - Input actions live in `Assets/InputSystem_Actions.inputactions`; prefer `PlayerInput` action maps.
 - For Mixamo imports, keep a consistent avatar and ensure root motion is disabled on scripted movement.
+- **DAE files use CreateFromThisModel:** Mixamo DAE animation files have complete humanoid skeleton definitions. Use `avatarSetup = CreateFromThisModel` (NOT `CopyFromOther`). Using `CopyFromOther` on DAE files causes skeleton double-scaling (bone positions 100x off), which makes the character disappear during playback. FBX clips can safely use `CopyFromOther`.
+- **Avatar source must match skeleton (FBX only):** When mixing FBX animation clips from different characters, each clip's `sourceAvatar` must point to the model with the matching skeleton. A clip with `mixamorig9_*` bones must use a `mixamorig9_*` avatar, not a different rig's avatar. Mismatched avatars cause Unity to silently fail to generate the AnimationClip (no error, just no clip in the asset).
+- **Blend trees must be sub-assets:** When creating a `BlendTree` programmatically, always call `AssetDatabase.AddObjectToAsset(blendTree, controller)` before assigning it to a state. Without this, the blend tree won't persist after domain reload.
 
 ## Current Workflow & Debugging
 - After code changes, let Unity recompile, wait for auto-setup to finish, then press Play.

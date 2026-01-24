@@ -77,6 +77,10 @@ public partial class ThirdPersonSetup
         {
             controller.AddParameter(ThirdPersonSetupConfig.HorizontalParam, UnityEngine.AnimatorControllerParameterType.Float);
         }
+        if (System.Array.Find(controller.parameters, p => p.name == ThirdPersonSetupConfig.VerticalParam) == null)
+        {
+            controller.AddParameter(ThirdPersonSetupConfig.VerticalParam, UnityEngine.AnimatorControllerParameterType.Float);
+        }
 
         // Create or update animation states
         UnityEditor.Animations.AnimatorState idleState = null;
@@ -103,9 +107,11 @@ public partial class ThirdPersonSetup
 
         ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinIdleClipPaths, avatarSourcePath);
         ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinWalkClipPaths, avatarSourcePath);
+        ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinWalkDirectionalClipPaths, avatarSourcePath);
 
         EnsureStateMotion(idleState, ThirdPersonSetupConfig.KevinIdleClipPaths);
         EnsureStateMotion(walkState, ThirdPersonSetupConfig.KevinWalkClipPaths);
+        TryApplyWalkBlendTree(walkState, controller);
 
         ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinTurnLeftClipPaths, avatarSourcePath);
         ConfigureAnimationFiles(ThirdPersonSetupConfig.KevinTurnRightClipPaths, avatarSourcePath);
@@ -572,6 +578,7 @@ public partial class ThirdPersonSetup
             if (childState.state.name == stateName)
             {
                 childState.state.motion = clip;
+                childState.state.iKOnFeet = ThirdPersonSetupConfig.UseAnimatorFootIk;
                 Debug.Log($"Updated existing {stateName} state");
                 return childState.state;
             }
@@ -580,6 +587,7 @@ public partial class ThirdPersonSetup
         // Create new state
         var newState = stateMachine.AddState(stateName);
         newState.motion = clip;
+        newState.iKOnFeet = ThirdPersonSetupConfig.UseAnimatorFootIk;
         Debug.Log($"Created {stateName} state");
         return newState;
     }
@@ -688,6 +696,35 @@ public partial class ThirdPersonSetup
             }
         }
     }
+    private static string ResolveAvatarSourceForClip(string clipPath, string defaultAvatarSource)
+    {
+        // If the clip is under Assets/Characters/<name>/, use that character's model as avatar source
+        if (!clipPath.StartsWith("Assets/Characters/"))
+            return defaultAvatarSource;
+
+        // Extract character directory: Assets/Characters/<name>/
+        string[] parts = clipPath.Replace("\\", "/").Split('/');
+        if (parts.Length < 3)
+            return defaultAvatarSource;
+
+        string characterDir = $"{parts[0]}/{parts[1]}/{parts[2]}";
+
+        // Find the main model (DAE or FBX) in the character root directory
+        string[] modelGuids = AssetDatabase.FindAssets("t:Model", new[] { characterDir });
+        foreach (string guid in modelGuids)
+        {
+            string modelPath = AssetDatabase.GUIDToAssetPath(guid);
+            string modelDir = Path.GetDirectoryName(modelPath).Replace("\\", "/");
+            // Only consider models in the character root (not in subdirectories like Animations/)
+            if (modelDir == characterDir && (modelPath.EndsWith(".dae") || modelPath.EndsWith(".fbx")))
+            {
+                return modelPath;
+            }
+        }
+
+        return defaultAvatarSource;
+    }
+
     internal static void ConfigureAnimationFile(string animFilePath, string avatarSourcePath)
     {
         Debug.Log($"Configuring animation file: {animFilePath}");
@@ -697,51 +734,55 @@ public partial class ThirdPersonSetup
 
         bool needsReimport = false;
 
-        string characterModelPath = avatarSourcePath;
-
-        // Configure animation type
         if (animImporter.animationType != ModelImporterAnimationType.Human)
         {
             animImporter.animationType = ModelImporterAnimationType.Human;
             needsReimport = true;
         }
 
-        // Copy avatar from character model
-        if (characterModelPath != null)
-        {
-            AssetDatabase.ImportAsset(characterModelPath, ImportAssetOptions.ForceUpdate);
-            UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(characterModelPath);
-            Avatar characterAvatar = null;
-
-            foreach (var asset in allAssets)
-            {
-                if (asset is Avatar)
-                {
-                    characterAvatar = asset as Avatar;
-                    break;
-                }
-            }
-
-            if (characterAvatar != null && animImporter.avatarSetup != ModelImporterAvatarSetup.CopyFromOther)
-            {
-                animImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
-                animImporter.sourceAvatar = characterAvatar;
-                needsReimport = true;
-            }
-        }
-
-        // Set scale for DAE files
-        if (animFilePath.EndsWith(".dae") && animImporter.globalScale != 0.01f)
-        {
-            animImporter.globalScale = 0.01f;
-            needsReimport = true;
-        }
-
-        // Don't import materials from animation files
         if (animImporter.materialImportMode != ModelImporterMaterialImportMode.None)
         {
             animImporter.materialImportMode = ModelImporterMaterialImportMode.None;
             needsReimport = true;
+        }
+
+        // Avatar setup: DAE files use CreateFromThisModel (they have full skeleton data
+        // and CopyFromOther causes skeleton double-scaling). FBX clips use CopyFromOther.
+        if (animFilePath.EndsWith(".dae"))
+        {
+            if (animImporter.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+            {
+                animImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                needsReimport = true;
+            }
+        }
+        else
+        {
+            string characterModelPath = ResolveAvatarSourceForClip(animFilePath, avatarSourcePath);
+
+            if (characterModelPath != null)
+            {
+                AssetDatabase.ImportAsset(characterModelPath, ImportAssetOptions.ForceUpdate);
+                UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(characterModelPath);
+                Avatar characterAvatar = null;
+
+                foreach (var asset in allAssets)
+                {
+                    if (asset is Avatar)
+                    {
+                        characterAvatar = asset as Avatar;
+                        break;
+                    }
+                }
+
+                if (characterAvatar != null &&
+                    (animImporter.avatarSetup != ModelImporterAvatarSetup.CopyFromOther || animImporter.sourceAvatar != characterAvatar))
+                {
+                    animImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+                    animImporter.sourceAvatar = characterAvatar;
+                    needsReimport = true;
+                }
+            }
         }
 
         // Configure animation clips
@@ -1001,6 +1042,88 @@ public partial class ThirdPersonSetup
         {
             animations[ThirdPersonSetupConfig.JumpLoopStateName] = jumpLoopClip;
         }
+    }
+
+    private static void TryApplyWalkBlendTree(UnityEditor.Animations.AnimatorState walkState, UnityEditor.Animations.AnimatorController controller)
+    {
+        if (walkState == null)
+        {
+            return;
+        }
+
+        AnimationClip[] clips = new AnimationClip[8];
+        string[] dirNames = { "Forward", "Backward", "Left", "Right", "ForwardLeft", "ForwardRight", "BackwardRight", "BackwardLeft" };
+        for (int i = 0; i < ThirdPersonSetupConfig.KevinWalkDirectionalClipPaths.Length && i < clips.Length; i++)
+        {
+            clips[i] = LoadFirstClip(ThirdPersonSetupConfig.KevinWalkDirectionalClipPaths[i]);
+            if (clips[i] != null)
+            {
+                Debug.Log($"Walk blend tree [{dirNames[i]}]: loaded '{clips[i].name}' from {ThirdPersonSetupConfig.KevinWalkDirectionalClipPaths[i]}");
+            }
+            else
+            {
+                Debug.LogWarning($"Walk blend tree [{dirNames[i]}]: FAILED to load from {ThirdPersonSetupConfig.KevinWalkDirectionalClipPaths[i]}");
+            }
+        }
+
+        int clipCount = 0;
+        foreach (var clip in clips)
+        {
+            if (clip != null)
+            {
+                clipCount++;
+            }
+        }
+
+        if (clipCount == 0)
+        {
+            Debug.LogWarning("Walk blend tree: no clips loaded, skipping blend tree creation.");
+            return;
+        }
+
+        // Remove old blend tree sub-assets to avoid accumulation
+        if (walkState.motion is UnityEditor.Animations.BlendTree oldTree)
+        {
+            UnityEngine.Object.DestroyImmediate(oldTree, true);
+        }
+
+        UnityEditor.Animations.BlendTree blendTree = CreateWalkBlendTree(clips);
+        blendTree.hideFlags = HideFlags.HideInHierarchy;
+        AssetDatabase.AddObjectToAsset(blendTree, controller);
+        walkState.motion = blendTree;
+        Debug.Log($"Walk blend tree: created with {clipCount}/8 clips and saved to controller asset.");
+    }
+
+    private static UnityEditor.Animations.BlendTree CreateWalkBlendTree(AnimationClip[] clips)
+    {
+        var blendTree = new UnityEditor.Animations.BlendTree();
+        blendTree.name = "Walk Blend Tree";
+        blendTree.blendType = UnityEditor.Animations.BlendTreeType.SimpleDirectional2D;
+        blendTree.blendParameter = ThirdPersonSetupConfig.HorizontalParam;
+        blendTree.blendParameterY = ThirdPersonSetupConfig.VerticalParam;
+        blendTree.useAutomaticThresholds = false;
+
+        Vector2[] positions = new Vector2[]
+        {
+            new Vector2(0f, 1f),     // Forward
+            new Vector2(0f, -1f),    // Backward
+            new Vector2(-1f, 0f),    // Left
+            new Vector2(1f, 0f),     // Right
+            new Vector2(-0.7f, 0.7f), // ForwardLeft
+            new Vector2(0.7f, 0.7f),  // ForwardRight
+            new Vector2(-0.7f, -0.7f), // BackwardLeft
+            new Vector2(0.7f, -0.7f)   // BackwardRight
+        };
+
+        for (int i = 0; i < clips.Length && i < positions.Length; i++)
+        {
+            if (clips[i] != null)
+            {
+                blendTree.AddChild(clips[i], positions[i]);
+            }
+        }
+
+        return blendTree;
     }
 
     private static void ValidateAnimatorSetup(UnityEditor.Animations.AnimatorController controller,

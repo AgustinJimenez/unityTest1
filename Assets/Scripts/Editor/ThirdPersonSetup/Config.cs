@@ -41,7 +41,7 @@ internal static class ThirdPersonSetupConfig
     public const float TurnInPlaceSpeedThreshold = 0.1f;
     public const float TurnInPlaceInputThreshold = 0.2f;
     public const float TurnInPlaceInputMax = 0.6f;
-    public const bool UseAnimatorFootIk = false;
+    public const bool UseAnimatorFootIk = true;
 
     public const string IdleStateName = "Idle";
     public const string WalkStateName = "Walk";
@@ -86,6 +86,17 @@ internal static class ThirdPersonSetupConfig
     {
         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx"
     };
+    public static readonly string[] KevinWalkDirectionalClipPaths =
+    {
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Backward.fbx",
+        "Assets/Characters/leonard/Animations/Left Strafe Walking.dae",
+        "Assets/Characters/leonard/Animations/Right Strafe Walking.dae",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_ForwardLeft.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_ForwardRight.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_BackwardRight.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_BackwardLeft.fbx"
+    };
 
     public static readonly string[] KevinJumpLoopClipPaths =
     {
@@ -117,14 +128,13 @@ internal static class ThirdPersonSetupConfig
         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Turn/HumanM@Turn01_Right.fbx"
     };
 
-    public const string SprintRootMotionPath = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run";
-    public static readonly string[] SprintAnimationNames =
+    public static readonly string[] SprintClipPaths =
     {
-        "HumanM@Run01_Forward",
-        "HumanM@Run01_ForwardLeft",
-        "HumanM@Run01_ForwardRight",
-        "HumanM@Run01_Left",
-        "HumanM@Run01_Right"
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardLeft.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardRight.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Left.fbx",
+        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Right.fbx"
     };
 
     public const string HairDiffuseSearch = "Ch31_1002_Diffuse";

@@ -5,49 +5,43 @@ public partial class ThirdPersonSetup
 {
     internal static void SetupKevinIglesiasSprint()
     {
-        // Use Sprint animations instead of Run - they might have better retargeting
-        string animBasePath = ThirdPersonSetupConfig.SprintRootMotionPath;
-        string[] animationNames = ThirdPersonSetupConfig.SprintAnimationNames;
+        string[] clipPaths = ThirdPersonSetupConfig.SprintClipPaths;
 
-        // First, fix the avatar configuration for these animations
-        ConfigureKevinIglesiasAnimations(animBasePath, animationNames);
+        // Configure avatar for each clip (resolves correct avatar per character)
+        ConfigureSprintAnimations(clipPaths);
 
-        // Then add them to the animator controller
+        // Add them to the animator controller
         var controller = GetActiveAnimatorController();
-        AddSprintToAnimatorController(controller, animBasePath, animationNames);
+        AddSprintToAnimatorController(controller, clipPaths);
     }
-    private static void ConfigureKevinIglesiasAnimations(string animBasePath, string[] animationNames)
+    private static void ConfigureSprintAnimations(string[] clipPaths)
     {
         string avatarSourcePath = !string.IsNullOrEmpty(LastAvatarSourcePath)
             ? LastAvatarSourcePath
             : ThirdPersonSetupConfig.DummyPrefabPath;
 
-        Debug.Log("Configuring Kevin Iglesias animations to copy the character avatar...");
+        Debug.Log("Configuring sprint animations avatar...");
 
-        foreach (string animName in animationNames)
+        foreach (string clipPath in clipPaths)
         {
-            string animPath = $"{animBasePath}/{animName}.fbx";
-            ModelImporter importer = AssetImporter.GetAtPath(animPath) as ModelImporter;
+            ModelImporter importer = AssetImporter.GetAtPath(clipPath) as ModelImporter;
 
             if (importer == null)
             {
-                Debug.LogError($"Could not find ModelImporter for: {animPath}");
-                ReportWarning($"Sprint clip missing importer: {animPath}");
+                Debug.LogError($"Could not find ModelImporter for: {clipPath}");
+                ReportWarning($"Sprint clip missing importer: {clipPath}");
                 continue;
             }
 
-            // Use the shared configuration to copy avatar + clip settings
-            ConfigureAnimationFile(animPath, avatarSourcePath);
+            ConfigureAnimationFile(clipPath, avatarSourcePath);
         }
 
-        // CRITICAL: Wait for Unity to finish importing
         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-        Debug.Log("Avatar configuration complete.");
+        Debug.Log("Sprint avatar configuration complete.");
 
-        // Give Unity a moment to process
         System.Threading.Thread.Sleep(1000);
     }
-    private static void AddSprintToAnimatorController(UnityEditor.Animations.AnimatorController controller, string animBasePath, string[] animationNames)
+    private static void AddSprintToAnimatorController(UnityEditor.Animations.AnimatorController controller, string[] clipPaths)
     {
         if (controller == null)
         {
@@ -56,13 +50,12 @@ public partial class ThirdPersonSetup
             return;
         }
 
-        AnimationClip[] sprintClips = new AnimationClip[animationNames.Length];
+        AnimationClip[] sprintClips = new AnimationClip[clipPaths.Length];
         int loadedCount = 0;
 
-        for (int i = 0; i < animationNames.Length; i++)
+        for (int i = 0; i < clipPaths.Length; i++)
         {
-            string animPath = $"{animBasePath}/{animationNames[i]}.fbx";
-            UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(animPath);
+            UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(clipPaths[i]);
 
             foreach (var asset in allAssets)
             {
@@ -70,15 +63,20 @@ public partial class ThirdPersonSetup
                 {
                     sprintClips[i] = c;
                     loadedCount++;
+                    Debug.Log($"Sprint clip[{i}]: {c.name} from {clipPaths[i]}");
                     break;
                 }
+            }
+
+            if (sprintClips[i] == null)
+            {
+                Debug.LogWarning($"Sprint clip[{i}]: FAILED to load from {clipPaths[i]}");
             }
         }
 
         if (loadedCount == 0)
         {
-            Debug.LogError("Sprint Setup Failed: No animation clips found in Kevin Iglesias Sprint animations.");
-            Debug.LogError($"Please select one of the .fbx files in {ThirdPersonSetupConfig.SprintRootMotionPath} and check if animations are imported.");
+            Debug.LogError("Sprint Setup Failed: No animation clips found.");
             ReportWarning("Sprint setup skipped: no sprint clips were loaded.");
             return;
         }
@@ -107,7 +105,7 @@ public partial class ThirdPersonSetup
 
         // Get or create Sprint state with blend tree
         var rootStateMachine = controller.layers[0].stateMachine;
-        var sprintState = GetOrCreateBlendTreeState(rootStateMachine, ThirdPersonSetupConfig.SprintStateName, sprintClips);
+        var sprintState = GetOrCreateBlendTreeState(rootStateMachine, ThirdPersonSetupConfig.SprintStateName, sprintClips, controller);
 
         // Find Walk state
         UnityEditor.Animations.AnimatorState walkState = null;
@@ -186,16 +184,25 @@ public partial class ThirdPersonSetup
     private static UnityEditor.Animations.AnimatorState GetOrCreateBlendTreeState(
         UnityEditor.Animations.AnimatorStateMachine stateMachine,
         string stateName,
-        AnimationClip[] clips)
+        AnimationClip[] clips,
+        UnityEditor.Animations.AnimatorController controller)
     {
         // Find existing state
         foreach (var childState in stateMachine.states)
         {
             if (childState.state.name == stateName)
             {
-                // Update the motion even if state exists
+                // Destroy old blend tree sub-asset
+                if (childState.state.motion is UnityEditor.Animations.BlendTree oldTree)
+                {
+                    Object.DestroyImmediate(oldTree, true);
+                }
+
                 var blendTree = CreateSprintBlendTree(clips);
+                blendTree.hideFlags = HideFlags.HideInHierarchy;
+                AssetDatabase.AddObjectToAsset(blendTree, controller);
                 childState.state.motion = blendTree;
+                childState.state.iKOnFeet = ThirdPersonSetupConfig.UseAnimatorFootIk;
                 return childState.state;
             }
         }
@@ -203,7 +210,10 @@ public partial class ThirdPersonSetup
         // Create new state
         var state = stateMachine.AddState(stateName);
         var newBlendTree = CreateSprintBlendTree(clips);
+        newBlendTree.hideFlags = HideFlags.HideInHierarchy;
+        AssetDatabase.AddObjectToAsset(newBlendTree, controller);
         state.motion = newBlendTree;
+        state.iKOnFeet = ThirdPersonSetupConfig.UseAnimatorFootIk;
         return state;
     }
     private static UnityEditor.Animations.BlendTree CreateSprintBlendTree(AnimationClip[] clips)

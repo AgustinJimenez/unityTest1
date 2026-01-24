@@ -1,5 +1,7 @@
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.InputSystem;
+using UnityEngine.Playables;
 
 [RequireComponent(typeof(CharacterController))]
 public class ThirdPersonController : MonoBehaviour
@@ -7,16 +9,29 @@ public class ThirdPersonController : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float walkSpeed = 4f;
     [SerializeField] private float sprintSpeed = 8f;
-    [SerializeField] private float rotationSpeed = 10f;
+    [SerializeField] private float rotationSpeed = 5f;
+    [SerializeField] private float turnInPlaceRotationSpeed = 0.5f;
     [SerializeField] private float acceleration = 10f;
-    [SerializeField] private bool enableTurnInPlace = true;
-    [SerializeField] private float turnInPlaceInputThreshold = 0.2f;
-    [SerializeField] private float turnInPlaceHoldTime = 0.2f;
-    [SerializeField] private float turnInPlaceInputMax = 0.6f;
+    [SerializeField] private bool rotateToCameraYaw = true;
+    [SerializeField] private bool enableTurnInPlace = false;
+    [SerializeField] private bool logTurnInPlaceToggle = true;
+    [SerializeField] private float turnInPlaceInputThreshold = 0.05f;
+    [SerializeField] private float turnInPlaceInputMax = 0.95f;
 
     [Header("Jump")]
     [SerializeField] private float jumpHeight = 2f;
     [SerializeField] private float gravity = -15f;
+
+    [Header("Debug Clip Play")]
+    [SerializeField] private bool enableDebugPlayClip = true;
+    [SerializeField] private bool debugPlayTurnInPlace = true;
+    [SerializeField] private string debugTurnRightClipName = "Turn01_Right";
+    [SerializeField] private string debugTurnLeftClipName = "Turn01_Left";
+    [SerializeField] private string playClipStateName = "Run01_Forward";
+    [SerializeField] private int playClipLayer = 0;
+    [SerializeField] private bool lockMovementDuringClip = true;
+    [SerializeField] private bool usePlayableGraphForDebugClip = true;
+    [SerializeField] private float debugTurnAngleDegrees = 90f;
 
     [Header("Ground Check")]
     [SerializeField] private float groundCheckDistance = 0.2f;
@@ -38,6 +53,14 @@ public class ThirdPersonController : MonoBehaviour
     private readonly int idleHash = Animator.StringToHash("Idle");
     private readonly int walkHash = Animator.StringToHash("Walk");
     private float turnInPlaceTimer;
+    [SerializeField] private bool showTurnInPlaceDebug = true;
+    private bool lastShouldTurnInPlace;
+    private bool isPlayingDebugClip;
+    private float debugClipEndTime;
+    private PlayableGraph debugGraph;
+    private AnimationClipPlayable debugClipPlayable;
+    private float debugTurnRemaining;
+    private float debugTurnSpeed;
 
     // Direct Input Action references
     private InputAction moveAction;
@@ -91,9 +114,12 @@ public class ThirdPersonController : MonoBehaviour
     private void Update()
     {
         CheckGround();
+        HandleDebugClipPlay();
+        HandleDebugTurnRotation();
         HandleMovement();
         HandleGravity();
         HandleJump();
+        HandleDebugToggles();
 
         // CRITICAL: Ensure Apply Root Motion stays disabled
         if (animator != null && animator.applyRootMotion)
@@ -104,6 +130,166 @@ public class ThirdPersonController : MonoBehaviour
         if (enableDebugLogs)
         {
             LogAnimatorStateChange();
+        }
+    }
+
+    private void HandleDebugToggles()
+    {
+        if (Keyboard.current == null)
+        {
+            return;
+        }
+
+        if (Keyboard.current.tKey.wasPressedThisFrame)
+        {
+            enableTurnInPlace = !enableTurnInPlace;
+            if (logTurnInPlaceToggle)
+            {
+                Debug.Log($"Turn-in-place toggled: {enableTurnInPlace}");
+            }
+        }
+    }
+
+    private void HandleDebugClipPlay()
+    {
+        if (!enableDebugPlayClip || animator == null || Keyboard.current == null)
+        {
+            return;
+        }
+
+        if (Keyboard.current.pKey.wasPressedThisFrame)
+        {
+            string clipToPlay = playClipStateName;
+            if (debugPlayTurnInPlace)
+            {
+                float inputX = moveAction != null ? moveAction.ReadValue<Vector2>().x : 1f;
+                float turnSign = inputX < 0f ? -1f : 1f;
+                clipToPlay = turnSign < 0f ? debugTurnLeftClipName : debugTurnRightClipName;
+                debugTurnRemaining = debugTurnAngleDegrees * turnSign;
+            }
+
+            if (string.IsNullOrWhiteSpace(clipToPlay))
+            {
+                Debug.LogWarning("Play clip requested, but playClipStateName is empty.");
+                return;
+            }
+
+            if (usePlayableGraphForDebugClip)
+            {
+                if (TryPlayDebugClip(clipToPlay, out float debugClipLength))
+                {
+                    debugClipEndTime = Time.time + debugClipLength;
+                    debugTurnSpeed = Mathf.Abs(debugTurnRemaining) > 0f ? Mathf.Abs(debugTurnRemaining) / debugClipLength : 0f;
+                    isPlayingDebugClip = true;
+                    if (enableDebugLogs)
+                    {
+                        Debug.Log($"[{Time.time:F2}] Debug clip play (PlayableGraph): {clipToPlay} length={debugClipLength:F2}s");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"Debug clip not found: {clipToPlay}");
+                }
+
+                return;
+            }
+
+            animator.Play(clipToPlay, playClipLayer, 0f);
+            animator.Update(0f);
+
+            float clipLength = 0f;
+            AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(playClipLayer);
+            if (clips.Length > 0 && clips[0].clip != null)
+            {
+                clipLength = clips[0].clip.length;
+            }
+
+            if (clipLength <= 0f)
+            {
+                clipLength = 1f;
+            }
+
+            debugClipEndTime = Time.time + clipLength;
+            debugTurnSpeed = Mathf.Abs(debugTurnRemaining) > 0f ? Mathf.Abs(debugTurnRemaining) / clipLength : 0f;
+            isPlayingDebugClip = true;
+            if (enableDebugLogs)
+            {
+                Debug.Log($"[{Time.time:F2}] Debug clip play (State): {clipToPlay} length={clipLength:F2}s");
+            }
+        }
+
+        if (isPlayingDebugClip && Time.time >= debugClipEndTime)
+        {
+            isPlayingDebugClip = false;
+            debugTurnRemaining = 0f;
+            debugTurnSpeed = 0f;
+            StopDebugGraph();
+        }
+    }
+
+    private void HandleDebugTurnRotation()
+    {
+        if (!isPlayingDebugClip || !debugPlayTurnInPlace)
+        {
+            return;
+        }
+
+        if (Mathf.Abs(debugTurnRemaining) <= 0.01f || debugTurnSpeed <= 0f)
+        {
+            return;
+        }
+
+        float delta = debugTurnSpeed * Time.deltaTime;
+        float step = Mathf.Min(Mathf.Abs(debugTurnRemaining), delta);
+        float signedStep = Mathf.Sign(debugTurnRemaining) * step;
+        transform.Rotate(0f, signedStep, 0f);
+        debugTurnRemaining -= signedStep;
+    }
+    
+    private bool TryPlayDebugClip(string clipName, out float clipLength)
+    {
+        clipLength = 0f;
+        RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+        if (controller == null)
+        {
+            Debug.LogWarning("Animator has no RuntimeAnimatorController.");
+            return false;
+        }
+
+        AnimationClip match = null;
+        foreach (AnimationClip clip in controller.animationClips)
+        {
+            if (clip != null && clip.name == clipName)
+            {
+                match = clip;
+                break;
+            }
+        }
+
+        if (match == null)
+        {
+            return false;
+        }
+
+        StopDebugGraph();
+
+        debugGraph = PlayableGraph.Create("DebugClipGraph");
+        debugGraph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+        var output = AnimationPlayableOutput.Create(debugGraph, "DebugClipOutput", animator);
+        debugClipPlayable = AnimationClipPlayable.Create(debugGraph, match);
+        debugClipPlayable.SetApplyFootIK(false);
+        debugClipPlayable.SetApplyPlayableIK(false);
+        output.SetSourcePlayable(debugClipPlayable);
+        debugGraph.Play();
+        clipLength = match.length;
+        return true;
+    }
+
+    private void StopDebugGraph()
+    {
+        if (debugGraph.IsValid())
+        {
+            debugGraph.Destroy();
         }
     }
 
@@ -179,6 +365,27 @@ public class ThirdPersonController : MonoBehaviour
     {
         if (moveAction == null || cameraTransform == null) return;
 
+        if (isPlayingDebugClip && lockMovementDuringClip)
+        {
+            if (animator != null)
+            {
+                animator.SetFloat("Speed", 0f);
+                if (HasParameter(animator, "IsSprinting"))
+                {
+                    animator.SetBool("IsSprinting", false);
+                }
+                if (HasParameter(animator, "Horizontal"))
+                {
+                    animator.SetFloat("Horizontal", 0f);
+                }
+                if (HasParameter(animator, "Vertical"))
+                {
+                    animator.SetFloat("Vertical", 0f);
+                }
+            }
+            return;
+        }
+
         // Read movement input
         Vector2 moveInput = moveAction.ReadValue<Vector2>();
 
@@ -194,43 +401,51 @@ public class ThirdPersonController : MonoBehaviour
             && Mathf.Abs(moveInput.x) > turnInPlaceInputThreshold
             && Mathf.Abs(moveInput.x) < turnInPlaceInputMax;
 
-        if (enableTurnInPlace && isGrounded && horizontalOnly)
-        {
-            turnInPlaceTimer += Time.deltaTime;
-        }
-        else
-        {
-            turnInPlaceTimer = 0f;
-        }
-
         bool shouldTurnInPlace = enableTurnInPlace
             && isGrounded
             && horizontalOnly
-            && turnInPlaceTimer < turnInPlaceHoldTime;
+            && !rotateToCameraYaw;
+        if (showTurnInPlaceDebug && shouldTurnInPlace != lastShouldTurnInPlace)
+        {
+            Debug.Log($"TurnInPlace changed: enabled={enableTurnInPlace} horizontalOnly={horizontalOnly} shouldTurn={shouldTurnInPlace} input=({moveInput.x:F2},{moveInput.y:F2})");
+        }
+        lastShouldTurnInPlace = shouldTurnInPlace;
 
         Vector3 desiredMoveDirection = shouldTurnInPlace
             ? right * Mathf.Sign(moveInput.x)
             : forward * moveInput.y + right * moveInput.x;
 
         // Check if sprinting
+        bool hasMoveInput = moveInput.sqrMagnitude > 0.01f;
         bool isSprinting = sprintAction != null
             && sprintAction.IsPressed()
-            && moveInput.sqrMagnitude > 0.01f
+            && hasMoveInput
             && !shouldTurnInPlace;
-        float targetSpeed = shouldTurnInPlace ? 0f : (isSprinting ? sprintSpeed : walkSpeed);
+        float targetSpeed = shouldTurnInPlace ? 0f : (hasMoveInput ? (isSprinting ? sprintSpeed : walkSpeed) : 0f);
 
         // Smoothly accelerate
-        if (desiredMoveDirection.magnitude > 0.1f)
+        if (desiredMoveDirection.magnitude > 0.1f || rotateToCameraYaw)
         {
             currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, acceleration * Time.deltaTime);
 
             // Rotate character
-            Quaternion targetRotation = Quaternion.LookRotation(desiredMoveDirection);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            Vector3 faceDirection = rotateToCameraYaw ? forward : desiredMoveDirection;
+            if (faceDirection.sqrMagnitude < 0.001f)
+            {
+                faceDirection = transform.forward;
+            }
+            Quaternion targetRotation = Quaternion.LookRotation(faceDirection);
+            float turnSpeed = shouldTurnInPlace ? turnInPlaceRotationSpeed : rotationSpeed;
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
         }
         else
         {
             currentSpeed = Mathf.Lerp(currentSpeed, 0, acceleration * Time.deltaTime);
+        }
+
+        if (shouldTurnInPlace)
+        {
+            currentSpeed = 0f;
         }
 
         // Apply movement
@@ -241,7 +456,7 @@ public class ThirdPersonController : MonoBehaviour
         if (animator != null)
         {
             // Normalize speed to 0-1 range based on walk speed
-            float normalizedSpeed = currentSpeed / walkSpeed;
+            float normalizedSpeed = shouldTurnInPlace ? 0f : (currentSpeed / walkSpeed);
             animator.SetFloat("Speed", normalizedSpeed);
 
             if (HasParameter(animator, "IsGrounded"))
@@ -258,14 +473,26 @@ public class ThirdPersonController : MonoBehaviour
             // Set directional blend tree parameters (for 8-directional sprint)
             if (HasParameter(animator, "Horizontal"))
             {
-                animator.SetFloat("Horizontal", moveInput.x);
+                animator.SetFloat("Horizontal", shouldTurnInPlace ? 0f : moveInput.x);
             }
             if (HasParameter(animator, "Vertical"))
             {
-                animator.SetFloat("Vertical", moveInput.y);
+                animator.SetFloat("Vertical", shouldTurnInPlace ? 0f : moveInput.y);
             }
 
         }
+    }
+
+    private void OnGUI()
+    {
+        if (!showTurnInPlaceDebug)
+        {
+            return;
+        }
+
+        string text = $"TurnInPlace: {(enableTurnInPlace ? "ON" : "OFF")} | ShouldTurn: {lastShouldTurnInPlace}\\n" +
+                      $"Input: ({(moveAction != null ? moveAction.ReadValue<Vector2>().x : 0f):F2}, {(moveAction != null ? moveAction.ReadValue<Vector2>().y : 0f):F2})";
+        GUI.Label(new Rect(10, 10, 500, 40), text);
     }
 
     private void HandleGravity()
