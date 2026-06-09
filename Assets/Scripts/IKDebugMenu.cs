@@ -24,8 +24,8 @@ public class IKDebugMenu : MonoBehaviour
     private static readonly float[] Defaults =
     {
         0f, 0.05f, 0.1f, 45f, 1f, 1f, 1f, 0.075f, 1.5f, 0.5f, 0.5f, 0f, 0.5f, 0f, 1f, 1f, 1f, 1f,
-        // Body Lower entries: enabled, maxExtraLowering, gapThreshold, smoothTime, speedFadeThreshold, ankleHeight
-        1f, 0.46f, 0.05f, 0.12f, 0.8f, 0.095f,
+        // Body Lower entries: enabled, maxExtraLowering, plantedThreshold, gapThreshold, smoothTime, speedFadeThreshold, ankleHeight
+        1f, 0.46f, 0.04f, 0.05f, 0.12f, 0.8f, 0.095f,
     };
 
     private static readonly Entry[] Entries =
@@ -50,6 +50,7 @@ public class IKDebugMenu : MonoBehaviour
         new Entry { field = "enableIKRotating",        label = "IK Rotating",              isBool = true, desc = "Toggles foot rotation to match slope normals. Disable if foot angle looks wrong on flat ground." },
         new Entry { field = "_bodyLowerEnabled",       label = "Body Lower",               isBool = true, isBodyLower = true, desc = "Extra body lowering to close the IK gap when one foot is over lower ground. Toggle to see the difference." },
         new Entry { field = "maxExtraLowering",        label = "BL Max Lowering",          step = 0.01f,  isBodyLower = true, desc = "Maximum extra downward body shift IKBodyLower can apply (metres). Watch BL offset in diagnostics." },
+        new Entry { field = "plantedThreshold",        label = "BL Planted Threshold",     step = 0.005f, isBodyLower = true, desc = "If all IK gaps (csHomebrewIK target - bone) are above -this, feet are planted and body lowering is skipped entirely." },
         new Entry { field = "gapThreshold",            label = "BL Gap Threshold",         step = 0.01f,  isBodyLower = true, desc = "Min gap (m) before IK target override fires. Raise if foot clips on ramps. Lower if large steps still float." },
         new Entry { field = "smoothTime",              label = "BL Smooth Time",           step = 0.01f,  isBodyLower = true, desc = "How quickly the extra body lowering ramps up/down. Lower = snappier but may jitter." },
         new Entry { field = "speedFadeThreshold",      label = "BL Speed Threshold",       step = 0.1f,   isBodyLower = true, desc = "Horizontal speed above which the body lowering fades to zero. Raise if correction should persist while walking." },
@@ -214,15 +215,23 @@ public class IKDebugMenu : MonoBehaviour
         }
 
         // Bone/IK target positions
-        Transform lFoot = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
-        Transform rFoot = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+        Transform hips    = anim.GetBoneTransform(HumanBodyBones.Hips);
+        Transform lFoot   = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
+        Transform rFoot   = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+        Transform lKnee   = anim.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
+        Transform rKnee   = anim.GetBoneTransform(HumanBodyBones.RightLowerLeg);
         Vector3 lIKTarget = ik._LeftFootIKPositionTarget;
         Vector3 rIKTarget = ik._RightFootIKPositionTarget;
+        float hipsY  = hips  != null ? hips.position.y  : 0f;
         float lBoneY = lFoot != null ? lFoot.position.y : 0f;
         float rBoneY = rFoot != null ? rFoot.position.y : 0f;
+        float lKneeY = lKnee != null ? lKnee.position.y : 0f;
+        float rKneeY = rKnee != null ? rKnee.position.y : 0f;
         sb.AppendLine("-- Bone & IK Targets --");
-        sb.AppendLine($"  L bone Y = {lBoneY:F4}   IK target Y = {lIKTarget.y:F4}   gap = {(lIKTarget.y - lBoneY):+0.0000;-0.0000;0.0000}");
-        sb.AppendLine($"  R bone Y = {rBoneY:F4}   IK target Y = {rIKTarget.y:F4}   gap = {(rIKTarget.y - rBoneY):+0.0000;-0.0000;0.0000}");
+        sb.AppendLine($"  hips Y    = {hipsY:F4}   bodyPos Y = {anim.bodyPosition.y:F4}   root Y = {transform.position.y:F4}");
+        sb.AppendLine($"  L foot Y  = {lBoneY:F4}   knee Y = {lKneeY:F4}   IK target Y = {lIKTarget.y:F4}   gap = {(lIKTarget.y - lBoneY):+0.0000;-0.0000;0.0000}");
+        sb.AppendLine($"  R foot Y  = {rBoneY:F4}   knee Y = {rKneeY:F4}   IK target Y = {rIKTarget.y:F4}   gap = {(rIKTarget.y - rBoneY):+0.0000;-0.0000;0.0000}");
+        sb.AppendLine($"  foot diff = {Mathf.Abs(lBoneY - rBoneY):F4}   hip→L = {(hipsY - lBoneY):F4}   hip→R = {(hipsY - rBoneY):F4}");
 
         // CharacterController
         if (cc != null)
@@ -237,6 +246,7 @@ public class IKDebugMenu : MonoBehaviour
         {
             sb.AppendLine("-- IKBodyLower --");
             sb.AppendLine($"  enabled       = {bodyLower.enabled}");
+            sb.AppendLine($"  needsHelp     = {bodyLower.DbgNeedsHelp}   ikGapL = {bodyLower.DbgIKGapL:+0.0000;-0.0000;0.0000}   ikGapR = {bodyLower.DbgIKGapR:+0.0000;-0.0000;0.0000}");
             sb.AppendLine($"  worstGap      = {bodyLower.DbgWorstGap:+0.0000;-0.0000;0.0000}");
             sb.AppendLine($"  leftGap       = {bodyLower.DbgLeftGap:+0.0000;-0.0000;0.0000}   override = {bodyLower.DbgLeftOverride}");
             sb.AppendLine($"  rightGap      = {bodyLower.DbgRightGap:+0.0000;-0.0000;0.0000}   override = {bodyLower.DbgRightOverride}");
@@ -372,7 +382,7 @@ public class IKDebugMenu : MonoBehaviour
         // Diagnostics panel — anchored to top-left so it's always visible
         if (anim != null)
         {
-            int   diagLines = bodyLower != null ? 10 : 7;
+            int   diagLines = bodyLower != null ? 14 : 9;
             float diagH     = diagLines * lh + pad * 2;
             float diagX     = pad;
             float diagY     = pad;
@@ -390,60 +400,91 @@ public class IKDebugMenu : MonoBehaviour
 
             GUI.Label(new Rect(diagX + pad, diagY + pad, width, lh), "DIAGNOSTICS", diagTitle);
 
-            Transform lFoot = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
-            Transform rFoot = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+            Transform hips   = anim.GetBoneTransform(HumanBodyBones.Hips);
+            Transform lFoot  = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
+            Transform rFoot  = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+            Transform lKnee  = anim.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
+            Transform rKnee  = anim.GetBoneTransform(HumanBodyBones.RightLowerLeg);
             Vector3 lIKTarget = ik._LeftFootIKPositionTarget;
             Vector3 rIKTarget = ik._RightFootIKPositionTarget;
 
-            float lBoneY  = lFoot  != null ? lFoot.position.y  : 0f;
-            float rBoneY  = rFoot  != null ? rFoot.position.y  : 0f;
+            float hipsY   = hips  != null ? hips.position.y  : 0f;
+            float lBoneY  = lFoot != null ? lFoot.position.y : 0f;
+            float rBoneY  = rFoot != null ? rFoot.position.y : 0f;
+            float lKneeY  = lKnee != null ? lKnee.position.y : 0f;
+            float rKneeY  = rKnee != null ? rKnee.position.y : 0f;
             float lGap    = lIKTarget.y - lBoneY;
             float rGap    = rIKTarget.y - rBoneY;
 
             // CharacterController grounding info
-            float ccBottomY   = cc != null ? (transform.position.y + cc.center.y - cc.height * 0.5f) : 0f;
-            bool  grounded    = cc != null && cc.isGrounded;
-            float footAboveCC = lFoot != null ? lBoneY - ccBottomY : 0f;
+            float ccBottomY = cc != null ? (transform.position.y + cc.center.y - cc.height * 0.5f) : 0f;
+            bool  grounded  = cc != null && cc.isGrounded;
 
             float rowBase = diagY + pad + lh;
-            GUI.Label(new Rect(diagX + pad, rowBase,          width, lh), $"  L bone Y:  {lBoneY:F4}   IK target: {lIKTarget.y:F4}", diagVal);
-            GUI.Label(new Rect(diagX + pad, rowBase + lh,     width, lh), $"  R bone Y:  {rBoneY:F4}   IK target: {rIKTarget.y:F4}", diagVal);
 
+            // Row 0-1: feet
+            GUI.Label(new Rect(diagX + pad, rowBase,      width, lh), $"  L foot Y: {lBoneY:F3}  knee: {lKneeY:F3}  IK tgt: {lIKTarget.y:F3}", diagVal);
+            GUI.Label(new Rect(diagX + pad, rowBase + lh, width, lh), $"  R foot Y: {rBoneY:F3}  knee: {rKneeY:F3}  IK tgt: {rIKTarget.y:F3}", diagVal);
+
+            // Row 2-3: IK gaps
             string lGapStr = $"  L gap (IK-bone): {lGap:+0.0000;-0.0000;0.0000}  {(Mathf.Abs(lGap) > 0.005f ? "^ pull" : "ok")}";
             string rGapStr = $"  R gap (IK-bone): {rGap:+0.0000;-0.0000;0.0000}  {(Mathf.Abs(rGap) > 0.005f ? "^ pull" : "ok")}";
             GUI.Label(new Rect(diagX + pad, rowBase + lh * 2, width, lh), lGapStr, Mathf.Abs(lGap) > 0.005f ? diagWarn : diagVal);
             GUI.Label(new Rect(diagX + pad, rowBase + lh * 3, width, lh), rGapStr, Mathf.Abs(rGap) > 0.005f ? diagWarn : diagVal);
 
-            string groundedStr = grounded ? "YES" : "NO  ← whole body floating";
+            // Row 4: hips + animator bodyPosition
+            float bodyPosY = bodyLower != null ? bodyLower.DbgBodyPosY : anim.bodyPosition.y;
+            GUI.Label(new Rect(diagX + pad, rowBase + lh * 4, width, lh),
+                $"  hips Y: {hipsY:F3}   bodyPos Y: {bodyPosY:F3}   root Y: {transform.position.y:F3}", diagVal);
+
+            // Row 5: CC
+            string groundedStr = grounded ? "YES" : "NO  ← body floating";
             GUIStyle groundedStyle = new GUIStyle(GUI.skin.label) { normal = { textColor = grounded ? Color.green : new Color(1f,0.3f,0.3f) } };
-            GUI.Label(new Rect(diagX + pad, rowBase + lh * 4, width, lh), $"  CC grounded: {groundedStr}", groundedStyle);
-            GUI.Label(new Rect(diagX + pad, rowBase + lh * 5, width, lh), $"  CC bottom Y: {ccBottomY:F4}   foot above CC: {footAboveCC:F4}", diagVal);
+            GUI.Label(new Rect(diagX + pad, rowBase + lh * 5, width, lh),
+                $"  CC grounded: {groundedStr}   bottom Y: {ccBottomY:F3}", groundedStyle);
+
+            // Row 6: foot-to-foot height diff
+            float footDiff = Mathf.Abs(lBoneY - rBoneY);
+            GUI.Label(new Rect(diagX + pad, rowBase + lh * 6, width, lh),
+                $"  foot diff: {footDiff:F3}   L-R: {(lBoneY - rBoneY):+0.000;-0.000;0.000}", diagVal);
+
+            // Row 7: hip-to-foot distances (leg stretch)
+            float lLegLen = hips != null && lFoot != null ? hipsY - lBoneY : 0f;
+            float rLegLen = hips != null && rFoot != null ? hipsY - rBoneY : 0f;
+            GUI.Label(new Rect(diagX + pad, rowBase + lh * 7, width, lh),
+                $"  hip→L foot: {lLegLen:F3}   hip→R foot: {rLegLen:F3}", diagVal);
 
             if (bodyLower != null)
             {
                 GUIStyle blStyle  = new GUIStyle(GUI.skin.label) { normal = { textColor = new Color(0.6f, 1f, 0.6f) } };
                 GUIStyle blActive = new GUIStyle(GUI.skin.label) { normal = { textColor = new Color(1f, 0.9f, 0.2f) } };
+                GUIStyle blSkip   = new GUIStyle(GUI.skin.label) { normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } };
 
                 if (!bodyLower.enabled)
                 {
-                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 6, width, lh), "  BL: disabled", blStyle);
+                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 8, width, lh), "  BL: disabled", blSkip);
                 }
                 else
                 {
-                    // Row 6: body offset + body position Y
-                    string row6 = $"  BL: tgt={bodyLower.DbgTargetOffset:+0.000;-0.000;0.000}  cur={bodyLower.DbgCurrentOffset:+0.000;-0.000;0.000}  bodyY={bodyLower.DbgBodyPosY:F3}";
-                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 6, width, lh), row6, blStyle);
+                    // Row 8: needsHelp + ikGaps from homebrew
+                    string needsStr = bodyLower.DbgNeedsHelp ? "NEEDS HELP" : "skip (planted)";
+                    string row8 = $"  BL: {needsStr}   ikGapL={bodyLower.DbgIKGapL:+0.000;-0.000;0.000}  ikGapR={bodyLower.DbgIKGapR:+0.000;-0.000;0.000}";
+                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 8, width, lh), row8, bodyLower.DbgNeedsHelp ? blActive : blSkip);
 
-                    // Row 7: per-foot gaps + override indicators
+                    // Row 9: body offset
+                    string row9 = $"  BL: tgt={bodyLower.DbgTargetOffset:+0.000;-0.000;0.000}  cur={bodyLower.DbgCurrentOffset:+0.000;-0.000;0.000}";
+                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 9, width, lh), row9, blStyle);
+
+                    // Row 10-11: per-foot gaps + overrides
                     string lOvr = bodyLower.DbgLeftOverride  ? " [OVR]" : "";
                     string rOvr = bodyLower.DbgRightOverride ? " [OVR]" : "";
-                    string row7 = $"  BL gaps: L={bodyLower.DbgLeftGap:+0.000;-0.000;0.000}{lOvr}  R={bodyLower.DbgRightGap:+0.000;-0.000;0.000}{rOvr}";
+                    string row10 = $"  BL gaps: L={bodyLower.DbgLeftGap:+0.000;-0.000;0.000}{lOvr}  R={bodyLower.DbgRightGap:+0.000;-0.000;0.000}{rOvr}";
                     bool anyOvr = bodyLower.DbgLeftOverride || bodyLower.DbgRightOverride;
-                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 7, width, lh), row7, anyOvr ? blActive : blStyle);
+                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 10, width, lh), row10, anyOvr ? blActive : blStyle);
 
-                    // Row 8: speed
-                    string row8 = $"  BL: spd={bodyLower.DbgHSpeed:F2}  (threshold={bodyLower.speedFadeThreshold:F1})  worstGap={bodyLower.DbgWorstGap:+0.000;-0.000;0.000}";
-                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 8, width, lh), row8, blStyle);
+                    // Row 11: speed + worstGap
+                    string row11 = $"  BL: spd={bodyLower.DbgHSpeed:F2}  (thr={bodyLower.speedFadeThreshold:F1})  worst={bodyLower.DbgWorstGap:+0.000;-0.000;0.000}";
+                    GUI.Label(new Rect(diagX + pad, rowBase + lh * 11, width, lh), row11, blStyle);
                 }
             }
         }

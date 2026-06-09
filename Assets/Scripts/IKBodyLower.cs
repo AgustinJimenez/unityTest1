@@ -20,6 +20,12 @@ public class IKBodyLower : MonoBehaviour
     [Tooltip("Max extra downward body offset this script can apply, in metres.")]
     [SerializeField] private float maxExtraLowering = 0.25f;
 
+    [Tooltip("If every foot's IK gap (csHomebrewIK target Y - bone Y) is above this value, " +
+             "csHomebrewIK already planted both feet — skip body lowering entirely. " +
+             "Requires csHomebrewIK to be earlier in the component list so its SetIKPosition " +
+             "calls are visible when this script reads GetIKPosition.")]
+    [SerializeField] private float plantedThreshold = 0.04f;
+
     [Tooltip("Minimum gap (metres) before the IK target override fires. " +
              "Prevents over-correction on gentle ramps where csHomebrewIK is sufficient.")]
     [SerializeField] private float gapThreshold = 0.05f;
@@ -53,16 +59,21 @@ public class IKBodyLower : MonoBehaviour
     public bool  DbgLeftOverride   { get; private set; }
     public bool  DbgRightOverride  { get; private set; }
     public float DbgBodyPosY       { get; private set; }
+    public bool  DbgNeedsHelp      { get; private set; }
+    public float DbgIKGapL         { get; private set; }
+    public float DbgIKGapR         { get; private set; }
 
-    private Animator            animator;
-    private CharacterController cc;
-    private float               currentOffset;
-    private float               offsetVelocity;
+    private Animator                  animator;
+    private CharacterController       cc;
+    private FischlWorks.csHomebrewIK  homebrew;
+    private float                     currentOffset;
+    private float                     offsetVelocity;
 
     private void Awake()
     {
         animator = GetComponent<Animator>();
-        cc = GetComponentInParent<CharacterController>();
+        cc       = GetComponentInParent<CharacterController>();
+        homebrew = GetComponent<FischlWorks.csHomebrewIK>();
     }
 
     private void OnAnimatorIK(int layerIndex)
@@ -85,31 +96,51 @@ public class IKBodyLower : MonoBehaviour
             DbgLeftGap  = leftGap;
             DbgRightGap = rightGap;
 
-            float worstGap = Mathf.Min(leftGap, rightGap);
+            float worstGap = Mathf.Min(leftGap, rightGap);   // raw raycast gap (for reference)
             DbgWorstGap    = worstGap;
 
-            // Gap is naturally ~0 on flat ground because ankleHeight is subtracted from
-            // the measured distance. Only fire when gap is genuinely negative (bone above target).
-            if (worstGap < 0f)
-                targetOffset = Mathf.Clamp(worstGap, -maxExtraLowering, 0f);
-
-            // Override csHomebrewIK's IK target (which may use foot-lifting to hold
-            // the foot at the animated bone height rather than the actual surface).
-            // Target = hit.point + hit.normal * ankleHeight so foot sits correctly
-            // above sloped surfaces and doesn't clip into ramps.
-            // gapThreshold prevents this override from firing on gentle ramps where
-            // the gap is small and csHomebrewIK's own correction is sufficient.
-            if (lValid && leftGap  < -gapThreshold)
+            // Use csHomebrewIK's IK targets to measure the actual residual gap —
+            // how far the foot bone still is from where csHomebrewIK wants it.
+            // This is far more accurate than IKBodyLower's own deep raycasts, which
+            // can hit geometry well below the actual walking surface.
+            float ikGapL = 0f, ikGapR = 0f;
+            if (homebrew != null)
             {
-                animator.SetIKPosition(AvatarIKGoal.LeftFoot, lTarget);
-                animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 1f);
-                DbgLeftOverride = true;
+                Transform lBone = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rBone = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                ikGapL = lBone != null ? homebrew._LeftFootIKPositionTarget.y  - lBone.position.y : 0f;
+                ikGapR = rBone != null ? homebrew._RightFootIKPositionTarget.y - rBone.position.y : 0f;
             }
-            if (rValid && rightGap < -gapThreshold)
+            DbgIKGapL = ikGapL;
+            DbgIKGapR = ikGapR;
+
+            // needsHelp: at least one foot has a residual gap csHomebrewIK can't close alone.
+            bool needsHelp = ikGapL < -plantedThreshold || ikGapR < -plantedThreshold;
+            DbgNeedsHelp = needsHelp;
+
+            if (needsHelp)
             {
-                animator.SetIKPosition(AvatarIKGoal.RightFoot, rTarget);
-                animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 1f);
-                DbgRightOverride = true;
+                // Drive body lowering from the actual IK gap, not the deep raycast gap.
+                // This means the body stops lowering exactly when the foot is planted —
+                // no over-lowering due to deep raycast artifacts.
+                float worstIKGap = Mathf.Min(ikGapL, ikGapR);
+                targetOffset = Mathf.Clamp(worstIKGap, -maxExtraLowering, 0f);
+
+                // Override csHomebrewIK's IK target for the foot that still can't reach.
+                // Uses IKBodyLower's own raycast target (hit.point + normal * ankleHeight)
+                // to bypass csHomebrewIK's foot-lifting when the gap is large.
+                if (lValid && leftGap  < -gapThreshold)
+                {
+                    animator.SetIKPosition(AvatarIKGoal.LeftFoot, lTarget);
+                    animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 1f);
+                    DbgLeftOverride = true;
+                }
+                if (rValid && rightGap < -gapThreshold)
+                {
+                    animator.SetIKPosition(AvatarIKGoal.RightFoot, rTarget);
+                    animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 1f);
+                    DbgRightOverride = true;
+                }
             }
         }
         else

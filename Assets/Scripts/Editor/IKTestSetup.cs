@@ -101,7 +101,10 @@ public static class IKTestSetup
 
         SerializedObject soIK = new SerializedObject(homebrew);
         soIK.FindProperty("groundLayers").intValue           = ~(1 << characterLayer);
-        soIK.FindProperty("enableBodyPositioning").boolValue = true;
+        // Body positioning disabled — IKBodyLower owns all body-height adjustment.
+        // csHomebrewIK's version crouches the body on small steps instead of just
+        // raising the leg, which looks wrong. IKBodyLower only fires for large drops.
+        soIK.FindProperty("enableBodyPositioning").boolValue = false;
         soIK.FindProperty("enableFootLifting").boolValue     = true;
         soIK.FindProperty("enableIKPositioning").boolValue   = true;
         soIK.FindProperty("enableIKRotating").boolValue      = true;
@@ -126,6 +129,8 @@ public static class IKTestSetup
         soBodyLower.FindProperty("ankleHeight").floatValue      = 0.05f + 0.045f;
         // maxExtraLowering: 0.460 verified — enough to plant foot on tall steps
         soBodyLower.FindProperty("maxExtraLowering").floatValue = 0.460f;
+        // plantedThreshold: skip body lowering if csHomebrewIK already planted both feet
+        soBodyLower.FindProperty("plantedThreshold").floatValue = 0.04f;
         // gapThreshold: IK override fires when gap > this value.
         // Too low = overcorrects on gentle ramps. Too high = residual float on steps.
         soBodyLower.FindProperty("gapThreshold").floatValue     = 0.08f;
