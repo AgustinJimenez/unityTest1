@@ -190,11 +190,19 @@ of the root position, or to call `CC.Move()` with a downward correction each fra
 
 ---
 
-## Next Steps
-1. ~~Implement `IKBodyLower.cs`~~ — done
-2. ~~Wire it up in `IKTestSetup.cs`~~ — done
-3. Re-run `Tools > Setup`, test on the step/ramp scene with new values
-4. Tune `gapThreshold` if step corrections are still incomplete or ramps still clip
+## Status — IK COMPLETE
+
+Foot IK is working well for its intended scope:
+- Flat ground, slopes, ramps ✓
+- Small steps (csHomebrewIK crouchRange handles alone) ✓
+- Tall steps up to leg-reach distance (IKBodyLower body lowering) ✓
+
+## Known Limitation — Drop Too Large
+
+When one foot hangs over a drop larger than leg reach, the foot floats.
+This is not an IK problem. Two gameplay solutions exist but are out of scope:
+1. **Edge nudge** — detect hanging foot, push character back onto platform (`SimpleCharacter.cs`)
+2. **Ledge hang** — detect edge, transition to hanging animation + hand IK system
 
 ---
 
