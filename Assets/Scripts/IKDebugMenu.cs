@@ -247,7 +247,7 @@ public class IKDebugMenu : MonoBehaviour
             sb.AppendLine("-- IKBodyLower --");
             sb.AppendLine($"  enabled       = {bodyLower.enabled}");
             sb.AppendLine($"  needsHelp     = {bodyLower.DbgNeedsHelp}   ikGapL = {bodyLower.DbgIKGapL:+0.0000;-0.0000;0.0000}   ikGapR = {bodyLower.DbgIKGapR:+0.0000;-0.0000;0.0000}");
-            sb.AppendLine($"  worstGap      = {bodyLower.DbgWorstGap:+0.0000;-0.0000;0.0000}");
+            sb.AppendLine($"  worstGap      = {bodyLower.DbgRaycastWorstGap:+0.0000;-0.0000;0.0000}");
             sb.AppendLine($"  leftGap       = {bodyLower.DbgLeftGap:+0.0000;-0.0000;0.0000}   override = {bodyLower.DbgLeftOverride}");
             sb.AppendLine($"  rightGap      = {bodyLower.DbgRightGap:+0.0000;-0.0000;0.0000}   override = {bodyLower.DbgRightOverride}");
             sb.AppendLine($"  targetOffset  = {bodyLower.DbgTargetOffset:+0.0000;-0.0000;0.0000}");
@@ -483,7 +483,7 @@ public class IKDebugMenu : MonoBehaviour
                     GUI.Label(new Rect(diagX + pad, rowBase + lh * 10, width, lh), row10, anyOvr ? blActive : blStyle);
 
                     // Row 11: speed + worstGap
-                    string row11 = $"  BL: spd={bodyLower.DbgHSpeed:F2}  (thr={bodyLower.speedFadeThreshold:F1})  worst={bodyLower.DbgWorstGap:+0.000;-0.000;0.000}";
+                    string row11 = $"  BL: spd={bodyLower.DbgHSpeed:F2}  (thr={bodyLower.speedFadeThreshold:F1})  worst={bodyLower.DbgRaycastWorstGap:+0.000;-0.000;0.000}";
                     GUI.Label(new Rect(diagX + pad, rowBase + lh * 11, width, lh), row11, blStyle);
                 }
             }

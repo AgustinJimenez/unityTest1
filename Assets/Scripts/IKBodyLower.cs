@@ -34,7 +34,7 @@ public class IKBodyLower : MonoBehaviour
     [SerializeField] private float smoothTime = 0.12f;
 
     [Tooltip("Horizontal speed above which the correction fades to zero.")]
-    [SerializeField] internal float speedFadeThreshold = 0.8f;
+    [SerializeField] public float speedFadeThreshold = 0.8f;
 
     [Tooltip("Ankle height above the surface (raySphereRadius + ankleHeightOffset from csHomebrewIK). " +
              "The IK target is placed this far above the surface along its normal.")]
@@ -50,10 +50,10 @@ public class IKBodyLower : MonoBehaviour
     [SerializeField] private float rayLength = 1.5f;
 
     // Read-only diagnostics for IKDebugMenu
-    public float DbgCurrentOffset  { get; private set; }
-    public float DbgTargetOffset   { get; private set; }
-    public float DbgWorstGap       { get; private set; }
-    public float DbgHSpeed         { get; private set; }
+    public float DbgCurrentOffset      { get; private set; }
+    public float DbgTargetOffset       { get; private set; }
+    public float DbgRaycastWorstGap    { get; private set; }
+    public float DbgHSpeed             { get; private set; }
     public float DbgLeftGap        { get; private set; }
     public float DbgRightGap       { get; private set; }
     public bool  DbgLeftOverride   { get; private set; }
@@ -62,6 +62,9 @@ public class IKBodyLower : MonoBehaviour
     public bool  DbgNeedsHelp      { get; private set; }
     public float DbgIKGapL         { get; private set; }
     public float DbgIKGapR         { get; private set; }
+
+    // Optional — when set, foot IK is suppressed during hang
+    [SerializeField] public LedgeDetector ledgeDetector;
 
     private Animator                  animator;
     private CharacterController       cc;
@@ -78,6 +81,16 @@ public class IKBodyLower : MonoBehaviour
 
     private void OnAnimatorIK(int layerIndex)
     {
+        // While hanging, skip foot IK entirely.
+        // transform.rotation is already held at HangRotation every frame by LedgeDetector.Update —
+        // no need to override animator.bodyRotation here (it causes double-rotation fighting).
+        bool hanging = ledgeDetector != null && ledgeDetector.IsHanging;
+        if (hanging)
+        {
+            DbgBodyPosY = animator.bodyPosition.y;
+            return;
+        }
+
         bool grounded   = cc == null || cc.isGrounded;
         float hSpeed    = cc != null ? Vector3.ProjectOnPlane(cc.velocity, Vector3.up).magnitude : 0f;
         bool canCorrect = grounded && hSpeed < speedFadeThreshold;
@@ -90,14 +103,18 @@ public class IKBodyLower : MonoBehaviour
 
         if (canCorrect)
         {
-            float leftGap  = GetGroundGap(HumanBodyBones.LeftFoot,  out Vector3 lTarget, out bool lValid);
-            float rightGap = GetGroundGap(HumanBodyBones.RightFoot, out Vector3 rTarget, out bool rValid);
+            Transform lBone = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+            Transform rBone = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+
+            float leftGap  = GetGroundGap(lBone, out Vector3 lTarget, out bool lValid);
+            float rightGap = GetGroundGap(rBone, out Vector3 rTarget, out bool rValid);
 
             DbgLeftGap  = leftGap;
             DbgRightGap = rightGap;
 
-            float worstGap = Mathf.Min(leftGap, rightGap);   // raw raycast gap (for reference)
-            DbgWorstGap    = worstGap;
+            // Raw raycast gap — for reference only; may hit geometry below the walking
+            // surface on steps/edges. Not used to drive body lowering.
+            DbgRaycastWorstGap = Mathf.Min(leftGap, rightGap);
 
             // Use csHomebrewIK's IK targets to measure the actual residual gap —
             // how far the foot bone still is from where csHomebrewIK wants it.
@@ -106,8 +123,6 @@ public class IKBodyLower : MonoBehaviour
             float ikGapL = 0f, ikGapR = 0f;
             if (homebrew != null)
             {
-                Transform lBone = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
-                Transform rBone = animator.GetBoneTransform(HumanBodyBones.RightFoot);
                 ikGapL = lBone != null ? homebrew._LeftFootIKPositionTarget.y  - lBone.position.y : 0f;
                 ikGapR = rBone != null ? homebrew._RightFootIKPositionTarget.y - rBone.position.y : 0f;
             }
@@ -145,9 +160,9 @@ public class IKBodyLower : MonoBehaviour
         }
         else
         {
-            DbgLeftGap  = 0f;
-            DbgRightGap = 0f;
-            DbgWorstGap = 0f;
+            DbgLeftGap         = 0f;
+            DbgRightGap        = 0f;
+            DbgRaycastWorstGap = 0f;
         }
 
         currentOffset = Mathf.SmoothDamp(
@@ -162,14 +177,15 @@ public class IKBodyLower : MonoBehaviour
         DbgBodyPosY = animator.bodyPosition.y;
     }
 
-    // Returns ankleTarget.y - uncorrectedBone.y (negative = bone above target).
-    // ankleTarget = hit.point + hit.normal * ankleHeight, so on flat ground the
-    // gap is naturally ~0 and no threshold is needed to suppress false positives.
+    // Returns ankleTarget.y - uncorrectedBone.y (negative = foot is above target = needs to come down).
+    // ankleTarget = hit.point + hit.normal * ankleHeight, so on flat ground the gap is ~0
+    // and no extra threshold is needed to suppress false positives.
     // Subtracts currentOffset from bone Y to recover the animation-pose position,
-    // preventing oscillation when the correction is successfully placing the foot.
-    private float GetGroundGap(HumanBodyBones bone, out Vector3 ankleTarget, out bool hitValid)
+    // preventing oscillation when the correction is already placing the foot correctly.
+    // The gap value itself is not used to drive body lowering — only lTarget/rTarget
+    // (the world-space IK override position) is used from the out parameter.
+    private float GetGroundGap(Transform t, out Vector3 ankleTarget, out bool hitValid)
     {
-        Transform t = animator.GetBoneTransform(bone);
         ankleTarget = Vector3.zero;
         hitValid = false;
         if (t == null) return 0f;

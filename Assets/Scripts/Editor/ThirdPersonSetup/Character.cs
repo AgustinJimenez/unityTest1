@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.Animations.Rigging;
 using System.IO;
+using FischlWorks;
 
 public partial class ThirdPersonSetup
 {
@@ -870,10 +871,18 @@ public partial class ThirdPersonSetup
             return;
         }
 
-        AnimatorFootIk animatorFootIk = animator.GetComponent<AnimatorFootIk>();
-        if (animatorFootIk == null)
+        // Remove old FootIK if present
+        FootIK oldFootIK = animator.GetComponent<FootIK>();
+        if (oldFootIK != null)
         {
-            animatorFootIk = Undo.AddComponent<AnimatorFootIk>(animator.gameObject);
+            Undo.DestroyObjectImmediate(oldFootIK);
+        }
+
+        // Add csHomebrewIK
+        csHomebrewIK homebrew = animator.GetComponent<csHomebrewIK>();
+        if (homebrew == null)
+        {
+            Undo.AddComponent<csHomebrewIK>(animator.gameObject);
         }
     }
 

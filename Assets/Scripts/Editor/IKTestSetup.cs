@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.Animations;
+using UnityEngine.Animations.Rigging;
 
 public static class IKTestSetup
 {
@@ -10,6 +11,7 @@ public static class IKTestSetup
     private const string IdlePrefabPath         = "Assets/HomebrewIK/Demo/Models/Armature_Idle.prefab";
     private const string IdleFbxPath            = "Assets/HomebrewIK/Demo/Animations/Idle.fbx";
     private const string WalkFbxPath            = "Assets/HomebrewIK/Demo/Animations/Run.fbx";
+    private const string HangIdleDaePath        = "Assets/Hanging Idle/Hanging Idle.dae";
     private const string GeneratedControllerPath = "Assets/FootIK_Demo.controller";
     private const string PlayerName             = "Player";
     private const string AutoRunPrefsKey        = "IKTestSetup.AutoRun";
@@ -46,6 +48,9 @@ public static class IKTestSetup
         // --- Physics layer ---
         int characterLayer = EnsureLayer(CharacterLayerName);
 
+        // --- Level geometry ---
+        BuildLevelGeometry();
+
         // Remove any previously created player first
         var existing = GameObject.Find(PlayerName);
         if (existing != null) Undo.DestroyObjectImmediate(existing);
@@ -68,7 +73,8 @@ public static class IKTestSetup
         GameObject player = (GameObject)PrefabUtility.InstantiatePrefab(idlePrefab);
         player.name = PlayerName;
         Undo.RegisterCreatedObjectUndo(player, "Create Player");
-        player.transform.position = new Vector3(0f, 2f, 0f);
+        // Spawn on top of Ledge_A (top surface at Y=1.5) so the player can walk to edges immediately
+        player.transform.position = new Vector3(14f, 3.5f, 8f);
         player.transform.rotation = Quaternion.identity;
 
         // Assign URP materials (prefab defaults to Built-in RP which shows pink in URP)
@@ -136,6 +142,27 @@ public static class IKTestSetup
         soBodyLower.FindProperty("gapThreshold").floatValue     = 0.08f;
         soBodyLower.ApplyModifiedProperties();
 
+        // --- Animation Rigging — hand IK for ledge hanging ---
+        SetupHandIKRig(animGO, animator,
+            out Transform leftHandTarget, out Transform rightHandTarget, out Rig handRig);
+
+        // --- LedgeDetector ---
+        LedgeDetector ledge = player.GetComponent<LedgeDetector>();
+        if (ledge == null) ledge = Undo.AddComponent<LedgeDetector>(player);
+        SerializedObject soLedge = new SerializedObject(ledge);
+        soLedge.FindProperty("groundLayers").intValue                    = ~(1 << characterLayer);
+        soLedge.FindProperty("leftHandTarget").objectReferenceValue      = leftHandTarget;
+        soLedge.FindProperty("rightHandTarget").objectReferenceValue     = rightHandTarget;
+        soLedge.FindProperty("handRig").objectReferenceValue             = handRig;
+        soLedge.FindProperty("footIK").objectReferenceValue              = animGO.GetComponent<FischlWorks.csHomebrewIK>();
+        soLedge.FindProperty("bodyLower").objectReferenceValue           = animGO.GetComponent<IKBodyLower>();
+        soLedge.FindProperty("characterAnimator").objectReferenceValue   = animator;
+        soLedge.ApplyModifiedProperties();
+
+        // Wire LedgeDetector back into IKBodyLower — must happen after LedgeDetector exists
+        soBodyLower.FindProperty("ledgeDetector").objectReferenceValue = ledge;
+        soBodyLower.ApplyModifiedProperties();
+
         // --- CharacterController sized to the actual mesh bounds ---
         CharacterController cc = player.GetComponent<CharacterController>();
         if (cc == null) cc = Undo.AddComponent<CharacterController>(player);
@@ -178,7 +205,8 @@ public static class IKTestSetup
         soCam.ApplyModifiedProperties();
 
         SerializedObject soChar = new SerializedObject(sc);
-        soChar.FindProperty("cameraTransform").objectReferenceValue = cam.transform;
+        soChar.FindProperty("cameraTransform").objectReferenceValue  = cam.transform;
+        soChar.FindProperty("ledgeDetector").objectReferenceValue    = player.GetComponent<LedgeDetector>();
         soChar.ApplyModifiedProperties();
 
         EditorSceneManager.SaveOpenScenes();
@@ -286,18 +314,32 @@ public static class IKTestSetup
 
         var cc = go.GetComponent<CharacterController>();
         if (cc != null) Undo.DestroyObjectImmediate(cc);
+
+        var ld = go.GetComponent<LedgeDetector>();
+        if (ld != null) Undo.DestroyObjectImmediate(ld);
     }
 
     private static AnimatorController BuildDemoController()
     {
         AnimationClip idleClip = null;
         AnimationClip runClip  = null;
+        AnimationClip hangClip = null;
 
         foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(IdleFbxPath))
             if (obj is AnimationClip c && !c.name.Contains("__preview__")) { idleClip = c; break; }
 
         foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(WalkFbxPath))
             if (obj is AnimationClip c && !c.name.Contains("__preview__")) { runClip = c; break; }
+
+        // Hanging Idle from Mixamo DAE — optional; controller still builds without it
+        AssetDatabase.ImportAsset(HangIdleDaePath, ImportAssetOptions.ForceSynchronousImport);
+        foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(HangIdleDaePath))
+            if (obj is AnimationClip c && !c.name.Contains("__preview__")) { hangClip = c; break; }
+
+        if (hangClip != null)
+            Debug.Log($"[Setup] Found hang clip: {hangClip.name}  length={hangClip.length:F2}s");
+        else
+            Debug.LogWarning("[Setup] Hang Idle clip not found — Hang state will be skipped.");
 
         if (idleClip == null || runClip == null)
         {
@@ -312,18 +354,20 @@ public static class IKTestSetup
 
         // Clear and rebuild parameters
         while (ac.parameters.Length > 0) ac.RemoveParameter(0);
-        ac.AddParameter("Speed", AnimatorControllerParameterType.Float);
+        ac.AddParameter("Speed",     AnimatorControllerParameterType.Float);
+        ac.AddParameter("IsHanging", AnimatorControllerParameterType.Bool);
 
         // Rebuild the base layer state machine
         var layer = ac.layers[0];
         layer.iKPass = true;
-        ac.layers    = new[] { layer };   // write back — layers is a copy
+        ac.layers    = new[] { layer };
 
         var sm = ac.layers[0].stateMachine;
         foreach (var s in sm.states) sm.RemoveState(s.state);
 
-        var blendTreeState = sm.AddState("Locomotion");
-        BlendTree bt = new BlendTree();
+        // Locomotion blend tree (Idle ↔ Run)
+        var locoState = sm.AddState("Locomotion", new Vector3(200, 0));
+        BlendTree bt  = new BlendTree();
         AssetDatabase.AddObjectToAsset(bt, GeneratedControllerPath);
         bt.name                   = "Locomotion";
         bt.blendType              = BlendTreeType.Simple1D;
@@ -331,13 +375,199 @@ public static class IKTestSetup
         bt.useAutomaticThresholds = false;
         bt.AddChild(idleClip, 0f);
         bt.AddChild(runClip,  1f);
-        blendTreeState.motion = bt;
-        sm.defaultState       = blendTreeState;
+        locoState.motion = bt;
+        sm.defaultState  = locoState;
+
+        // Hang state (only added when clip is available)
+        if (hangClip != null)
+        {
+            var hangState = sm.AddState("Hang", new Vector3(200, 120));
+            hangState.motion = hangClip;
+
+            // Locomotion → Hang
+            var toHang = locoState.AddTransition(hangState);
+            toHang.AddCondition(AnimatorConditionMode.If, 0, "IsHanging");
+            toHang.duration            = 0.15f;
+            toHang.hasExitTime         = false;
+
+            // Hang → Locomotion
+            var toLoco = hangState.AddTransition(locoState);
+            toLoco.AddCondition(AnimatorConditionMode.IfNot, 0, "IsHanging");
+            toLoco.duration            = 0.2f;
+            toLoco.hasExitTime         = false;
+        }
 
         EditorUtility.SetDirty(ac);
         AssetDatabase.SaveAssets();
-        Debug.Log("[Setup] Built FootIK_Demo.controller with Idle→Run blend tree.");
+        Debug.Log("[Setup] Built FootIK_Demo.controller.");
         return ac;
+    }
+
+    // ── Level geometry ───────────────────────────────────────────────────────
+
+    private const string LevelRootName = "Level";
+
+    private static void BuildLevelGeometry()
+    {
+        // Tear down from a previous run
+        var old = GameObject.Find(LevelRootName);
+        if (old != null) Undo.DestroyObjectImmediate(old);
+
+        var root = new GameObject(LevelRootName);
+        Undo.RegisterCreatedObjectUndo(root, "Create Level");
+
+        // ── Floor ─────────────────────────────────────────────────────────────
+        // 60×60 flat, top face at Y=0
+        Box(root, "Floor", pos: new Vector3(0, -0.5f, 0), scale: new Vector3(60, 1, 60));
+
+        // ── Stepped ramp (straight ahead from spawn, along +Z) ───────────────
+        // Four steps leading up so the foot IK ramp/slope behaviour is visible
+        Box(root, "Step_Low",    pos: new Vector3(0, 0.10f,  8f), scale: new Vector3(5, 0.20f, 3));
+        Box(root, "Step_Mid",    pos: new Vector3(0, 0.25f, 13f), scale: new Vector3(5, 0.50f, 3));
+        Box(root, "Step_High",   pos: new Vector3(0, 0.50f, 18f), scale: new Vector3(5, 1.00f, 3));
+        Box(root, "Step_Tall",   pos: new Vector3(0, 0.75f, 23f), scale: new Vector3(5, 1.50f, 3));
+
+        // ── Diagonal ramp (slope for foot rotation IK, to the right) ─────────
+        // Tilted slab — low end at Z≈4, high end at Z≈10, rise ~1.2 m over 6 m
+        var ramp = Box(root, "Ramp", pos: new Vector3(9, 0.55f, 7f), scale: new Vector3(4, 0.3f, 7));
+        ramp.transform.localEulerAngles = new Vector3(-18, 0, 0);
+
+        // ── Ledge platforms (tall drop on at least one side) ──────────────────
+        // These are the primary targets for the ledge hang system.
+        // "Ledge_*" — character walks onto them, approaches edge, drop > 0.8 m triggers hang.
+
+        // Island A — 1.5 m tall, to the right (+X)
+        Box(root, "Ledge_A", pos: new Vector3(14, 0.75f,  8f), scale: new Vector3(8, 1.5f, 8));
+
+        // Island B — 2.0 m tall, further right
+        Box(root, "Ledge_B", pos: new Vector3(14, 1.00f, 20f), scale: new Vector3(8, 2.0f, 8));
+
+        // Island C — 1.2 m tall, to the left (−X)
+        Box(root, "Ledge_C", pos: new Vector3(-12, 0.60f, 8f), scale: new Vector3(8, 1.2f, 8));
+
+        // Island D — 1.8 m tall, far left — narrow, good for hang testing
+        Box(root, "Ledge_D", pos: new Vector3(-12, 0.90f, 20f), scale: new Vector3(6, 1.8f, 6));
+
+        // ── Scattered low obstacles (misc step/bump testing) ──────────────────
+        Box(root, "Bump_A", pos: new Vector3( 5,  0.08f, -5f), scale: new Vector3(3, 0.16f, 3));
+        Box(root, "Bump_B", pos: new Vector3(-5,  0.12f, -8f), scale: new Vector3(3, 0.24f, 4));
+        Box(root, "Bump_C", pos: new Vector3( 8,  0.06f, -3f), scale: new Vector3(2, 0.12f, 2));
+
+        EditorUtility.SetDirty(root);
+        Debug.Log("[Setup] Level geometry rebuilt.");
+    }
+
+    // Creates a cube primitive parented under root. Returns the GameObject so
+    // the caller can adjust rotation if needed (e.g. the ramp).
+    private static GameObject Box(GameObject parent, string name, Vector3 pos, Vector3 scale)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Undo.RegisterCreatedObjectUndo(go, $"Create {name}");
+        go.name = name;
+        go.transform.SetParent(parent.transform, false);
+        go.transform.localPosition = pos;
+        go.transform.localScale    = scale;
+        // Static flags so Unity can batch/lightmap the geometry
+        GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic
+                                                 | StaticEditorFlags.OccluderStatic
+                                                 | StaticEditorFlags.OccludeeStatic);
+        return go;
+    }
+
+    private static void SetupHandIKRig(GameObject animGO, Animator animator,
+        out Transform leftHandTarget, out Transform rightHandTarget, out Rig handRig)
+    {
+        leftHandTarget  = null;
+        rightHandTarget = null;
+        handRig         = null;
+
+        // Tear down any rig from a previous run
+        var existingRig = animGO.transform.Find("IKRig");
+        if (existingRig != null) Undo.DestroyObjectImmediate(existingRig.gameObject);
+
+        var existingRigBuilder = animGO.GetComponent<RigBuilder>();
+        if (existingRigBuilder != null) Undo.DestroyObjectImmediate(existingRigBuilder);
+
+        // RigBuilder on the Animator GO
+        var rigBuilder = Undo.AddComponent<RigBuilder>(animGO);
+
+        // IKRig child GO
+        var rigGO = new GameObject("IKRig");
+        Undo.RegisterCreatedObjectUndo(rigGO, "Create IKRig");
+        rigGO.transform.SetParent(animGO.transform, false);
+        var rig = Undo.AddComponent<Rig>(rigGO);
+        rig.weight = 0f;  // blended out until a ledge grab occurs
+
+        // Wire Rig into RigBuilder layers list
+        var soRB      = new SerializedObject(rigBuilder);
+        var layersProp = soRB.FindProperty("m_RigLayers");
+        layersProp.ClearArray();
+        layersProp.InsertArrayElementAtIndex(0);
+        var layerElem = layersProp.GetArrayElementAtIndex(0);
+        layerElem.FindPropertyRelative("m_Rig").objectReferenceValue = rig;
+        layerElem.FindPropertyRelative("m_Active").boolValue         = true;
+        soRB.ApplyModifiedProperties();
+
+        // TwoBoneIK for each arm
+        leftHandTarget  = SetupArmIK(rigGO, animator, "Left",
+            HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
+        rightHandTarget = SetupArmIK(rigGO, animator, "Right",
+            HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
+
+        handRig = rig;
+        EditorUtility.SetDirty(animGO);
+        Debug.Log("[Setup] Animation Rigging hand IK rig created.");
+    }
+
+    private static Transform SetupArmIK(GameObject rigGO, Animator animator, string side,
+        HumanBodyBones upperArmBone, HumanBodyBones lowerArmBone, HumanBodyBones handBone)
+    {
+        Transform upperArmT = animator.GetBoneTransform(upperArmBone);
+        Transform lowerArmT = animator.GetBoneTransform(lowerArmBone);
+        Transform handT     = animator.GetBoneTransform(handBone);
+
+        if (upperArmT == null || lowerArmT == null || handT == null)
+        {
+            Debug.LogWarning($"[Setup] {side} arm bones not found — skipping arm IK.");
+            return null;
+        }
+
+        // Constraint GO under the Rig
+        var constraintGO = new GameObject($"{side}HandIK");
+        Undo.RegisterCreatedObjectUndo(constraintGO, $"Create {side}HandIK");
+        constraintGO.transform.SetParent(rigGO.transform, false);
+        var constraint = Undo.AddComponent<TwoBoneIKConstraint>(constraintGO);
+
+        // Hand target — starts at the animated hand bone world position
+        var targetGO = new GameObject($"{side}HandTarget");
+        Undo.RegisterCreatedObjectUndo(targetGO, $"Create {side}HandTarget");
+        targetGO.transform.SetParent(constraintGO.transform, false);
+        targetGO.transform.position = handT.position;
+        targetGO.transform.rotation = handT.rotation;
+
+        // Elbow hint — placed on the elbow's "outward" side to preserve natural bend
+        var hintGO = new GameObject($"{side}ElbowHint");
+        Undo.RegisterCreatedObjectUndo(hintGO, $"Create {side}ElbowHint");
+        hintGO.transform.SetParent(constraintGO.transform, false);
+        Vector3 midPoint    = (upperArmT.position + handT.position) * 0.5f;
+        Vector3 elbowOffset = (lowerArmT.position - midPoint).normalized;
+        hintGO.transform.position = lowerArmT.position + elbowOffset * 0.3f;
+
+        // Wire constraint data
+        var so = new SerializedObject(constraint);
+        so.FindProperty("m_Data.m_Root").objectReferenceValue              = upperArmT;
+        so.FindProperty("m_Data.m_Mid").objectReferenceValue               = lowerArmT;
+        so.FindProperty("m_Data.m_Tip").objectReferenceValue               = handT;
+        so.FindProperty("m_Data.m_Target").objectReferenceValue            = targetGO.transform;
+        so.FindProperty("m_Data.m_Hint").objectReferenceValue              = hintGO.transform;
+        so.FindProperty("m_Data.m_TargetPositionWeight").floatValue        = 1f;
+        so.FindProperty("m_Data.m_TargetRotationWeight").floatValue        = 0f;
+        so.FindProperty("m_Data.m_HintWeight").floatValue                  = 0.5f;
+        so.FindProperty("m_Data.m_MaintainTargetPositionOffset").boolValue = false;
+        so.FindProperty("m_Data.m_MaintainTargetRotationOffset").boolValue = false;
+        so.ApplyModifiedProperties();
+
+        return targetGO.transform;
     }
 
     private static void AssignURPMaterials(GameObject player)

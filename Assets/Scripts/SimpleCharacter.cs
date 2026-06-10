@@ -4,7 +4,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 public class SimpleCharacter : MonoBehaviour
 {
-    [SerializeField] public Transform cameraTransform;
+    [SerializeField] public Transform    cameraTransform;
+    [SerializeField] public LedgeDetector ledgeDetector;
     [SerializeField] private float moveSpeed  = 4f;
     [SerializeField] private float turnSpeed  = 15f;
     [SerializeField] private float gravity    = -15f;
@@ -14,6 +15,7 @@ public class SimpleCharacter : MonoBehaviour
     private Animator animator;
     private float verticalVelocity;
     private bool hasSpeedParam;
+    private bool hasHangingParam;
 
     private void Awake()
     {
@@ -21,11 +23,28 @@ public class SimpleCharacter : MonoBehaviour
         animator   = GetComponentInChildren<Animator>();
         if (animator != null)
             foreach (var p in animator.parameters)
-                if (p.name == "Speed") { hasSpeedParam = true; break; }
+            {
+                if (p.name == "Speed")     hasSpeedParam    = true;
+                if (p.name == "IsHanging") hasHangingParam  = true;
+            }
     }
 
     private void Update()
     {
+        // Freeze locomotion while hanging — LedgeDetector owns movement in that state
+        bool isHanging = ledgeDetector != null && ledgeDetector.IsHanging;
+        if (animator != null && hasHangingParam)
+            animator.SetBool("IsHanging", isHanging);
+
+        if (isHanging)
+        {
+            verticalVelocity = 0f;
+            controller.Move(Vector3.zero);
+            if (animator != null && hasSpeedParam)
+                animator.SetFloat("Speed", 0f);
+            return;
+        }
+
         var keyboard = Keyboard.current;
         if (keyboard == null) return;
 

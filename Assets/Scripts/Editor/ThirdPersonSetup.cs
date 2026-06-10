@@ -9,7 +9,7 @@ public partial class ThirdPersonSetup : EditorWindow
     [InitializeOnLoadMethod]
     private static void AutoRunOnCompile()
     {
-        if (!EditorPrefs.GetBool(AutoRunPrefsKey, true))
+        if (!EditorPrefs.GetBool(AutoRunPrefsKey, false))
         {
             return;
         }

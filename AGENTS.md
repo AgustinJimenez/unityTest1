@@ -48,3 +48,33 @@ This repository is a Unity 6 (6000.3.2f1) project using URP and the new Input Sy
 - `ThirdPersonController` logs jump/state transitions by default; use the Console for clip names and timestamps.
 - For historical logs, check the Unity Editor log (macOS: `~/Library/Logs/Unity/Editor.log`) and filter with `rg` when needed.
 - When you need my attention to continue, play a TTS notification with a clear custom message.
+
+## Computer Control MCP Setup
+This project has a computer-control MCP server configured that allows Claude to interact with the Unity Editor via mouse, keyboard, and screenshots.
+
+### Available Tools
+- `take_screenshot` / `take_screenshot_with_ocr` - Capture screen and extract text
+- `click_screen` / `move_mouse` / `drag_mouse` - Mouse control
+- `type_text` / `press_keys` - Keyboard input
+- `key_down` / `key_up` - Hold/release keys
+- `mouse_down` / `mouse_up` - Hold/release mouse buttons
+- `activate_window` / `list_windows` - Window management
+- `wait_milliseconds` - Timing control
+- `get_screen_size` - Screen dimensions
+
+### Configuration Files
+- `.mcp.json` - MCP server configuration pointing to `computer-control-mcp.exe`
+- `.claude/settings.local.json` - Pre-approved permissions for all MCP tools
+
+### Usage Tips
+- Use OCR-based screenshots when possible to minimize token usage
+- Only request full visual screenshots when OCR can't identify UI elements
+- Unity Editor must be visible on screen for interactions to work
+- For Windows Graphics Capture (GPU-accelerated windows), the `COMPUTER_CONTROL_MCP_WGC_PATTERNS` env var is set to `unity,game`
+
+### Workflow with Computer Control
+1. Take a screenshot to see the current Unity Editor state
+2. Use OCR or visual analysis to identify UI elements
+3. Click menus, buttons, hierarchy items as needed
+4. Type into fields, use keyboard shortcuts
+5. Verify actions with follow-up screenshots
