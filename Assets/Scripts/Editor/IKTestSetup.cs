@@ -36,8 +36,22 @@ public static class IKTestSetup
     }
 
     [MenuItem("Tools/Setup")]
-    public static void Run()
+    public static void Run() => RunInternal(force: false);
+
+    [MenuItem("Tools/Setup (Force Rebuild)")]
+    public static void RunForced() => RunInternal(force: true);
+
+    private static void RunInternal(bool force)
     {
+        // Skip the rebuild — and its fileID churn — when nothing that affects the
+        // generated controller/scene has changed since the last successful build.
+        if (!force && BuildIsUpToDate())
+        {
+            Debug.Log("[Setup] No relevant changes since last build — skipped. " +
+                      "Use Tools/Setup (Force Rebuild) to rebuild anyway.");
+            return;
+        }
+
         // Always reimport the scene from disk — never use Unity's cached (possibly dirty) version
         AssetDatabase.ImportAsset(ScenePath, ImportAssetOptions.ForceUpdate);
         AssetDatabase.Refresh();
@@ -223,8 +237,49 @@ public static class IKTestSetup
         soChar.ApplyModifiedProperties();
 
         EditorSceneManager.SaveOpenScenes();
+        EditorPrefs.SetString(BuildHashKey, ComputeBuildHash());
         Debug.Log("[Setup] Done. Hit Play — WASD to move, mouse to rotate camera.");
     }
+
+    // ── Build-up-to-date gate ─────────────────────────────────────────────────
+    // A build is "up to date" when this script's source and the input animation
+    // assets are unchanged since the last successful build. Re-running setup then
+    // is a no-op — which avoids re-serializing the controller/scene with fresh
+    // fileIDs, the source of the large no-op git diffs. AutoRunOnCompile also
+    // benefits: editing any other script no longer triggers a full rebuild.
+
+    private static string BuildHashKey => "IKTestSetup.BuildHash:" + Application.dataPath;
+
+    private static bool BuildIsUpToDate()
+    {
+        // If the controller is missing, a rebuild is always needed.
+        if (!System.IO.File.Exists(GeneratedControllerPath)) return false;
+        return EditorPrefs.GetString(BuildHashKey, "") == ComputeBuildHash();
+    }
+
+    private static string ComputeBuildHash()
+    {
+        var sb = new System.Text.StringBuilder();
+
+        // This script defines the entire controller/scene structure, so any edit to
+        // it (a transition value, a state, geometry) must invalidate the build.
+        try { sb.Append(System.IO.File.ReadAllText(SourceFilePath())); }
+        catch { sb.Append(System.Guid.NewGuid().ToString()); } // unreadable -> never matches
+
+        // Swapping an input clip (e.g. the air animation) must invalidate it too.
+        foreach (var p in new[] {
+            IdlePrefabPath, IdleFbxPath, WalkFbxPath, HangIdleDaePath,
+            JumpBeginFbxPath, JumpAirFbxPath, JumpLandFbxPath })
+            sb.Append(p).Append('=').Append(AssetDatabase.AssetPathToGUID(p)).Append(';');
+
+        using (var md5 = System.Security.Cryptography.MD5.Create())
+            return System.Convert.ToBase64String(
+                md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(sb.ToString())));
+    }
+
+    // Compile-time absolute path of this source file — used to detect edits.
+    private static string SourceFilePath(
+        [System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
