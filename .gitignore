@@ -74,3 +74,16 @@ tools/tts_output.wav
 # Temporary auto-generated Android Assets
 [Aa]ssets/[Ss]treamingAssets/aa.meta
 [Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Claude Code local session/config
+.claude/
+.mcp.json
+
+# Unity API upgrade log
+UpgradeLog.htm
+
+# Unity scene auto-recovery dumps
+[Aa]ssets/_Recovery/
+
+# Accidental Windows shell redirect artifact (echo ... > nul)
+nul
