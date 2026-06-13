@@ -220,9 +220,6 @@ public static class IKTestSetup
             cam.tag = "MainCamera";
         }
 
-        var freeCam = cam.GetComponent<FreeCam>();
-        if (freeCam != null) Undo.DestroyObjectImmediate(freeCam);
-
         FollowCamera follow = cam.GetComponent<FollowCamera>();
         if (follow == null) follow = Undo.AddComponent<FollowCamera>(cam.gameObject);
 
