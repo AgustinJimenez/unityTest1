@@ -87,3 +87,6 @@ UpgradeLog.htm
 
 # Accidental Windows shell redirect artifact (echo ... > nul)
 nul
+
+# Generated animation inventory (scratch reference, regenerable)
+animation_inventory.txt

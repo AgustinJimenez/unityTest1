@@ -6,19 +6,19 @@ using UnityEngine.Animations.Rigging;
 
 public static class IKTestSetup
 {
-    private const string ScenePath              = "Assets/FootIK_Test.unity";
+    private const string ScenePath              = "Assets/_Game/Scenes/FootIK_Test.unity";
     private const string CharacterLayerName     = "Character";
-    private const string IdlePrefabPath         = "Assets/HomebrewIK/Demo/Models/Armature_Idle.prefab";
-    private const string IdleFbxPath            = "Assets/HomebrewIK/Demo/Animations/Idle.fbx";
-    private const string WalkFbxPath            = "Assets/HomebrewIK/Demo/Animations/Run.fbx";
-    private const string HangIdleDaePath        = "Assets/Hanging Idle/Hanging Idle.dae";
-    private const string JumpBeginFbxPath       = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx";
+    private const string IdlePrefabPath         = "Assets/ThirdParty/HomebrewIK/Demo/Models/Armature_Idle.prefab";
+    private const string IdleFbxPath            = "Assets/ThirdParty/HomebrewIK/Demo/Animations/Idle.fbx";
+    private const string WalkFbxPath            = "Assets/ThirdParty/HomebrewIK/Demo/Animations/Run.fbx";
+    private const string HangIdleDaePath        = "Assets/ThirdParty/Hanging Idle/Hanging Idle.dae";
+    private const string JumpBeginFbxPath       = "Assets/ThirdParty/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx";
     // Fall01 is the pack's airborne hold loop, meant to sit between Begin and Land for
     // variable-height jumps. Do NOT use HumanM@Jump01.fbx here: it is the FULL jump
     // (takeoff+air+land, looping), so long airtime visibly restarts the jump at the peak.
-    private const string JumpAirFbxPath         = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx";
-    private const string JumpLandFbxPath        = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Land.fbx";
-    private const string GeneratedControllerPath = "Assets/FootIK_Demo.controller";
+    private const string JumpAirFbxPath         = "Assets/ThirdParty/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx";
+    private const string JumpLandFbxPath        = "Assets/ThirdParty/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Land.fbx";
+    private const string GeneratedControllerPath = "Assets/_Game/Animation/FootIK_Demo.controller";
     private const string PlayerName             = "Player";
     private const string AutoRunPrefsKey        = "IKTestSetup.AutoRun";
 
@@ -748,7 +748,7 @@ public static class IKTestSetup
     private static void AssignURPMaterials(GameObject player)
     {
         // Map Built-in material names to their URP equivalents
-        string urpFolder = "Assets/HomebrewIK/Demo/Materials/URP";
+        string urpFolder = "Assets/ThirdParty/HomebrewIK/Demo/Materials/URP";
         var urpMaterials = new System.Collections.Generic.Dictionary<string, Material>();
 
         foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { urpFolder }))
