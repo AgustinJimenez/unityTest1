@@ -66,17 +66,50 @@ public class IKBodyLower : MonoBehaviour
     // Optional — when set, foot IK is suppressed during hang
     [SerializeField] public LedgeDetector ledgeDetector;
 
+
     private Animator                  animator;
     private CharacterController       cc;
     private FischlWorks.csHomebrewIK  homebrew;
     private float                     currentOffset;
     private float                     offsetVelocity;
+    private int                       prevAirStateHash = 0;
+    private bool                      homebrewBodyPositioningDefault = true;
 
     private void Awake()
     {
         animator = GetComponent<Animator>();
         cc       = GetComponentInParent<CharacterController>();
         homebrew = GetComponent<FischlWorks.csHomebrewIK>();
+        if (homebrew != null)
+            homebrewBodyPositioningDefault = homebrew._EnableBodyPositioning;
+    }
+
+    private void Update()
+    {
+        if (homebrew == null) return;
+
+        // Gate homebrew's body positioning to grounded-in-Locomotion frames.
+        // ApplyBodyIK shifts animator.bodyPosition unconditionally — zeroing the foot
+        // IK weights in OnAnimatorIK does NOT suppress it, and its smoothed buffers lag
+        // during jumps, which makes the mesh sink on ascent and pop up at touchdown.
+        // Set from Update because it runs before this frame's IK pass; the animator
+        // state info here is one frame stale, which only delays the gate by a frame.
+        bool hanging      = ledgeDetector != null && ledgeDetector.IsHanging;
+        bool inLocomotion = animator.GetCurrentAnimatorStateInfo(0).IsName("Locomotion")
+                         && !animator.IsInTransition(0);
+        homebrew._EnableBodyPositioning =
+            homebrewBodyPositioningDefault && !hanging && inLocomotion && IsGrounded();
+    }
+
+    // CheckSphere instead of cc.isGrounded — the latter flickers when deltaTime is
+    // tiny (slow-motion) because it depends on Move() contact each frame.
+    private bool IsGrounded()
+    {
+        if (cc == null) return true;
+        Vector3 feetPos = cc.transform.position + cc.center
+                        + Vector3.down * (cc.height * 0.5f - cc.radius + 0.02f);
+        return Physics.CheckSphere(feetPos, cc.radius + 0.05f,
+                   ~(1 << gameObject.layer), QueryTriggerInteraction.Ignore);
     }
 
     private void OnAnimatorIK(int layerIndex)
@@ -88,12 +121,66 @@ public class IKBodyLower : MonoBehaviour
         if (hanging)
         {
             DbgBodyPosY = animator.bodyPosition.y;
+            if (homebrew != null && homebrew.enabled) homebrew.enabled = false;
+            // Homebrew only gets disabled now, so on the grab frame it has already run
+            // and set full weights toward ground targets — zero them or the feet get
+            // pulled toward the ground for one frame while the body snaps to the wall.
+            animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot,  0f);
+            animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
+            animator.SetIKRotationWeight(AvatarIKGoal.LeftFoot,  0f);
+            animator.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
             return;
         }
 
-        bool grounded   = cc == null || cc.isGrounded;
+        bool grounded = IsGrounded();
+
+        // Keep homebrew always enabled so its internal IK targets stay fresh even during
+        // the jump. IKBodyLower zeroes the weights when IK shouldn't be visible, which
+        // suppresses homebrew's effect without letting its state go stale.
+        if (homebrew != null && !homebrew.enabled) homebrew.enabled = true;
+
+        // Only apply foot IK when FULLY in Locomotion (not mid-transition).
+        bool inLocomotion = animator.GetCurrentAnimatorStateInfo(0).IsName("Locomotion")
+                         && !animator.IsInTransition(0);
+        bool enableFootIK = grounded && inLocomotion;
+
+        if (!enableFootIK)
+        {
+            var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+            int curHash   = stateInfo.shortNameHash
+                          ^ (animator.IsInTransition(0)
+                                ? animator.GetNextAnimatorStateInfo(0).shortNameHash : 0);
+            if (curHash != prevAirStateHash)
+            {
+                prevAirStateHash = curHash;
+                Transform lFoot  = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rFoot  = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                Transform lKnee  = animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
+                Transform rKnee  = animator.GetBoneTransform(HumanBodyBones.RightLowerLeg);
+                Transform lThigh = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+                Transform rThigh = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+                string stateName = stateInfo.IsName("Locomotion") ? "Loco"
+                                 : stateInfo.IsName("JumpBegin")  ? "Begin"
+                                 : stateInfo.IsName("JumpAir")    ? "Air"
+                                 : stateInfo.IsName("JumpLand")   ? "Land"
+                                 : stateInfo.IsName("Fall")       ? "Fall"
+                                 : stateInfo.IsName("Hang")       ? "Hang"
+                                 : $"h{stateInfo.shortNameHash}";
+                string next = animator.IsInTransition(0)
+                    ? $"→{animator.GetNextAnimatorStateInfo(0).shortNameHash}" : "";
+                float normTime = stateInfo.normalizedTime % 1f;
+                Debug.Log($"[AirLegs] t={Time.time:F2}  state={stateName}({normTime:F2}){next}  " +
+                          $"grnd={grounded}  loco={inLocomotion}  ikEN={enableFootIK}  root={transform.position.y:F3}  " +
+                          $"LFoot={lFoot?.position.y:F3} LKnee={lKnee?.position.y:F3} LThigh={lThigh?.position.y:F3}  " +
+                          $"RFoot={rFoot?.position.y:F3} RKnee={rKnee?.position.y:F3} RThigh={rThigh?.position.y:F3}");
+            }
+        }
+        else
+        {
+            prevAirStateHash = 0; // reset so next air entry logs fresh
+        }
         float hSpeed    = cc != null ? Vector3.ProjectOnPlane(cc.velocity, Vector3.up).magnitude : 0f;
-        bool canCorrect = grounded && hSpeed < speedFadeThreshold;
+        bool canCorrect = enableFootIK && hSpeed < speedFadeThreshold;
         DbgHSpeed = hSpeed;
 
         float targetOffset = 0f;
@@ -173,6 +260,17 @@ public class IKBodyLower : MonoBehaviour
 
         if (Mathf.Abs(currentOffset) > 0.0001f)
             animator.bodyPosition += Vector3.up * currentOffset;
+
+        // When IK is not active (air / transitions), zero the weights so homebrew's effect
+        // is invisible — but homebrew itself keeps running to maintain fresh IK targets.
+        // This avoids knee flip: IK weight is always binary (0 or 1), never partial.
+        if (!enableFootIK)
+        {
+            animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot,  0f);
+            animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
+            animator.SetIKRotationWeight(AvatarIKGoal.LeftFoot,  0f);
+            animator.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
+        }
 
         DbgBodyPosY = animator.bodyPosition.y;
     }

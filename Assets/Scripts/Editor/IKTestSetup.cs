@@ -12,6 +12,12 @@ public static class IKTestSetup
     private const string IdleFbxPath            = "Assets/HomebrewIK/Demo/Animations/Idle.fbx";
     private const string WalkFbxPath            = "Assets/HomebrewIK/Demo/Animations/Run.fbx";
     private const string HangIdleDaePath        = "Assets/Hanging Idle/Hanging Idle.dae";
+    private const string JumpBeginFbxPath       = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx";
+    // Fall01 is the pack's airborne hold loop, meant to sit between Begin and Land for
+    // variable-height jumps. Do NOT use HumanM@Jump01.fbx here: it is the FULL jump
+    // (takeoff+air+land, looping), so long airtime visibly restarts the jump at the peak.
+    private const string JumpAirFbxPath         = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx";
+    private const string JumpLandFbxPath        = "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Land.fbx";
     private const string GeneratedControllerPath = "Assets/FootIK_Demo.controller";
     private const string PlayerName             = "Player";
     private const string AutoRunPrefsKey        = "IKTestSetup.AutoRun";
@@ -74,7 +80,7 @@ public static class IKTestSetup
         player.name = PlayerName;
         Undo.RegisterCreatedObjectUndo(player, "Create Player");
         // Spawn on top of Ledge_A (top surface at Y=1.5) so the player can walk to edges immediately
-        player.transform.position = new Vector3(14f, 3.5f, 8f);
+        player.transform.position = new Vector3(14f, 13.5f, 8f);
         player.transform.rotation = Quaternion.identity;
 
         // Assign URP materials (prefab defaults to Built-in RP which shows pink in URP)
@@ -175,7 +181,14 @@ public static class IKTestSetup
 
         // --- IK debug menu ---
         IKDebugMenu dbg = player.GetComponent<IKDebugMenu>();
-        if (dbg == null) Undo.AddComponent<IKDebugMenu>(player);
+        if (dbg == null) dbg = Undo.AddComponent<IKDebugMenu>(player);
+
+        // --- Escape menu (toggles the debug overlays) ---
+        GameMenu menu = player.GetComponent<GameMenu>();
+        if (menu == null) menu = Undo.AddComponent<GameMenu>(player);
+        SerializedObject soMenu = new SerializedObject(menu);
+        soMenu.FindProperty("ikDebugMenu").objectReferenceValue = dbg;
+        soMenu.ApplyModifiedProperties();
 
         // --- Camera ---
         Camera cam = Object.FindFirstObjectByType<Camera>();
@@ -293,7 +306,9 @@ public static class IKTestSetup
         cc.height     = Mathf.Max(height, radius * 2f + 0.01f);
         cc.radius     = radius;
         cc.center     = new Vector3(0f, centerY, 0f);
-        cc.stepOffset = Mathf.Clamp(height * 0.1f, 0.05f, 0.4f);
+        // Step offset must clear the tallest stair step (0.45 m grand staircase).
+        // Using 0.25× height gives ~0.45 m for a 1.8 m character.
+        cc.stepOffset = Mathf.Clamp(height * 0.25f, 0.1f, 0.55f);
         cc.skinWidth  = 0.008f;
 
         Debug.Log($"[Setup] CharacterController sized from bounds — height:{cc.height:F2} radius:{cc.radius:F2} center.y:{cc.center.y:F2}");
@@ -319,33 +334,33 @@ public static class IKTestSetup
         if (ld != null) Undo.DestroyObjectImmediate(ld);
     }
 
+    private static AnimationClip LoadFirstClip(string path)
+    {
+        foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path))
+            if (obj is AnimationClip c && !c.name.Contains("__preview__")) return c;
+        return null;
+    }
+
     private static AnimatorController BuildDemoController()
     {
-        AnimationClip idleClip = null;
-        AnimationClip runClip  = null;
-        AnimationClip hangClip = null;
+        var idleClip      = LoadFirstClip(IdleFbxPath);
+        var runClip       = LoadFirstClip(WalkFbxPath);
 
-        foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(IdleFbxPath))
-            if (obj is AnimationClip c && !c.name.Contains("__preview__")) { idleClip = c; break; }
-
-        foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(WalkFbxPath))
-            if (obj is AnimationClip c && !c.name.Contains("__preview__")) { runClip = c; break; }
-
-        // Hanging Idle from Mixamo DAE — optional; controller still builds without it
         AssetDatabase.ImportAsset(HangIdleDaePath, ImportAssetOptions.ForceSynchronousImport);
-        foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(HangIdleDaePath))
-            if (obj is AnimationClip c && !c.name.Contains("__preview__")) { hangClip = c; break; }
+        var hangClip      = LoadFirstClip(HangIdleDaePath);
 
-        if (hangClip != null)
-            Debug.Log($"[Setup] Found hang clip: {hangClip.name}  length={hangClip.length:F2}s");
-        else
-            Debug.LogWarning("[Setup] Hang Idle clip not found — Hang state will be skipped.");
+        var jumpBeginClip = LoadFirstClip(JumpBeginFbxPath);
+        var jumpAirClip   = LoadFirstClip(JumpAirFbxPath);
+        var jumpLandClip  = LoadFirstClip(JumpLandFbxPath);
 
         if (idleClip == null || runClip == null)
         {
             Debug.LogError("[Setup] Could not find Idle or Run clip in HomebrewIK FBXes.");
             return null;
         }
+
+        if (hangClip      == null) Debug.LogWarning("[Setup] Hang Idle clip not found — Hang state skipped.");
+        if (jumpBeginClip == null) Debug.LogWarning("[Setup] Jump Begin clip not found — Jump states skipped.");
 
         // Reuse existing asset so the scene reference stays valid across re-runs
         var ac = AssetDatabase.LoadAssetAtPath<AnimatorController>(GeneratedControllerPath);
@@ -354,8 +369,11 @@ public static class IKTestSetup
 
         // Clear and rebuild parameters
         while (ac.parameters.Length > 0) ac.RemoveParameter(0);
-        ac.AddParameter("Speed",     AnimatorControllerParameterType.Float);
-        ac.AddParameter("IsHanging", AnimatorControllerParameterType.Bool);
+        ac.AddParameter("Speed",          AnimatorControllerParameterType.Float);
+        ac.AddParameter("IsHanging",      AnimatorControllerParameterType.Bool);
+        ac.AddParameter("IsGrounded",       AnimatorControllerParameterType.Bool);
+        ac.AddParameter("VerticalVelocity", AnimatorControllerParameterType.Float);
+        ac.AddParameter("TimeInAir",        AnimatorControllerParameterType.Float);
 
         // Rebuild the base layer state machine
         var layer = ac.layers[0];
@@ -378,23 +396,87 @@ public static class IKTestSetup
         locoState.motion = bt;
         sm.defaultState  = locoState;
 
-        // Hang state (only added when clip is available)
+        // Jump states
+        bool hasJump = jumpBeginClip != null && jumpAirClip != null && jumpLandClip != null;
+        if (hasJump)
+        {
+            var jumpBeginState = sm.AddState("JumpBegin", new Vector3(500, -80));
+            var jumpAirState   = sm.AddState("JumpAir",   new Vector3(500,   0));
+            var jumpLandState  = sm.AddState("JumpLand",  new Vector3(500,  80));
+
+            jumpBeginState.motion = jumpBeginClip;
+            jumpAirState.motion   = jumpAirClip;
+            jumpLandState.motion  = jumpLandClip;
+
+            // Locomotion → JumpBegin  (just left the ground going up)
+            var locoToBegin = locoState.AddTransition(jumpBeginState);
+            locoToBegin.AddCondition(AnimatorConditionMode.IfNot,   0,    "IsGrounded");
+            locoToBegin.AddCondition(AnimatorConditionMode.Greater, 0.5f, "VerticalVelocity");
+            locoToBegin.hasExitTime = false;
+            locoToBegin.duration    = 0.1f;
+
+            // Locomotion → JumpAir  (walked off an edge — no jump, already falling)
+            var locoToAir = locoState.AddTransition(jumpAirState);
+            locoToAir.AddCondition(AnimatorConditionMode.IfNot, 0,     "IsGrounded");
+            locoToAir.AddCondition(AnimatorConditionMode.Less,  -0.5f, "VerticalVelocity");
+            locoToAir.hasExitTime = false;
+            locoToAir.duration    = 0.15f;
+
+            // JumpBegin → JumpAir  (let takeoff finish)
+            var beginToAir = jumpBeginState.AddTransition(jumpAirState);
+            beginToAir.hasExitTime = true;
+            beginToAir.exitTime    = 0.7f;
+            beginToAir.duration    = 0.1f;
+
+            // JumpAir → JumpLand
+            var airToLand = jumpAirState.AddTransition(jumpLandState);
+            airToLand.AddCondition(AnimatorConditionMode.If, 0, "IsGrounded");
+            airToLand.hasExitTime = false;
+            airToLand.duration    = 0.1f;
+
+            // JumpLand → JumpBegin  (jumped again before landing clip finished)
+            var landToBegin = jumpLandState.AddTransition(jumpBeginState);
+            landToBegin.AddCondition(AnimatorConditionMode.IfNot,   0,    "IsGrounded");
+            landToBegin.AddCondition(AnimatorConditionMode.Greater, 0.5f, "VerticalVelocity");
+            landToBegin.hasExitTime = false;
+            landToBegin.duration    = 0.05f;
+
+            // JumpAir → JumpBegin  (bunny-hop: landed for one frame and jumped again)
+            var airToBegin = jumpAirState.AddTransition(jumpBeginState);
+            airToBegin.AddCondition(AnimatorConditionMode.IfNot,   0,    "IsGrounded");
+            airToBegin.AddCondition(AnimatorConditionMode.Greater, 2.0f, "VerticalVelocity");
+            airToBegin.hasExitTime = false;
+            airToBegin.duration    = 0.05f;
+
+            // JumpLand → Locomotion  (blend out over the last ~30% of the clip).
+            // duration is in NORMALIZED clip time (hasFixedDuration = false) so that
+            // exitTime + duration < 1.0 holds for any clip length — the blend finishes
+            // before the clip can loop back to frame 0 and bleed the air pose through
+            // (the "weird legs" glitch). A fixed-seconds duration can't guarantee this.
+            var landToLoco = jumpLandState.AddTransition(locoState);
+            landToLoco.hasExitTime      = true;
+            landToLoco.exitTime         = 0.50f;
+            landToLoco.hasFixedDuration = false;
+            landToLoco.duration         = 0.48f;
+
+            Debug.Log("[Setup] Jump states wired.");
+        }
+
+        // Hang state
         if (hangClip != null)
         {
-            var hangState = sm.AddState("Hang", new Vector3(200, 120));
+            var hangState = sm.AddState("Hang", new Vector3(200, 200));
             hangState.motion = hangClip;
 
-            // Locomotion → Hang
             var toHang = locoState.AddTransition(hangState);
             toHang.AddCondition(AnimatorConditionMode.If, 0, "IsHanging");
-            toHang.duration            = 0.15f;
-            toHang.hasExitTime         = false;
+            toHang.duration    = 0.15f;
+            toHang.hasExitTime = false;
 
-            // Hang → Locomotion
             var toLoco = hangState.AddTransition(locoState);
             toLoco.AddCondition(AnimatorConditionMode.IfNot, 0, "IsHanging");
-            toLoco.duration            = 0.2f;
-            toLoco.hasExitTime         = false;
+            toLoco.duration    = 0.2f;
+            toLoco.hasExitTime = false;
         }
 
         EditorUtility.SetDirty(ac);
@@ -417,38 +499,79 @@ public static class IKTestSetup
         Undo.RegisterCreatedObjectUndo(root, "Create Level");
 
         // ── Floor ─────────────────────────────────────────────────────────────
-        // 60×60 flat, top face at Y=0
-        Box(root, "Floor", pos: new Vector3(0, -0.5f, 0), scale: new Vector3(60, 1, 60));
+        // 160×160 flat, top face at Y=0
+        Box(root, "Floor", pos: new Vector3(0, -0.5f, 0), scale: new Vector3(160, 1, 160));
 
-        // ── Stepped ramp (straight ahead from spawn, along +Z) ───────────────
-        // Four steps leading up so the foot IK ramp/slope behaviour is visible
-        Box(root, "Step_Low",    pos: new Vector3(0, 0.10f,  8f), scale: new Vector3(5, 0.20f, 3));
-        Box(root, "Step_Mid",    pos: new Vector3(0, 0.25f, 13f), scale: new Vector3(5, 0.50f, 3));
-        Box(root, "Step_High",   pos: new Vector3(0, 0.50f, 18f), scale: new Vector3(5, 1.00f, 3));
-        Box(root, "Step_Tall",   pos: new Vector3(0, 0.75f, 23f), scale: new Vector3(5, 1.50f, 3));
+        // ── Small test steps (straight ahead from spawn, along +Z) ───────────
+        Box(root, "Step_Low",  pos: new Vector3(0, 0.10f,  8f), scale: new Vector3(5, 0.20f, 3));
+        Box(root, "Step_Mid",  pos: new Vector3(0, 0.25f, 13f), scale: new Vector3(5, 0.50f, 3));
+        Box(root, "Step_High", pos: new Vector3(0, 0.50f, 18f), scale: new Vector3(5, 1.00f, 3));
+        Box(root, "Step_Tall", pos: new Vector3(0, 0.75f, 23f), scale: new Vector3(5, 1.50f, 3));
 
-        // ── Diagonal ramp (slope for foot rotation IK, to the right) ─────────
-        // Tilted slab — low end at Z≈4, high end at Z≈10, rise ~1.2 m over 6 m
+        // ── Diagonal ramp (slope for foot rotation IK) ───────────────────────
         var ramp = Box(root, "Ramp", pos: new Vector3(9, 0.55f, 7f), scale: new Vector3(4, 0.3f, 7));
         ramp.transform.localEulerAngles = new Vector3(-18, 0, 0);
 
-        // ── Ledge platforms (tall drop on at least one side) ──────────────────
-        // These are the primary targets for the ledge hang system.
-        // "Ledge_*" — character walks onto them, approaches edge, drop > 0.8 m triggers hang.
+        // ── Ledge islands (hang testing) ──────────────────────────────────────
+        Box(root, "Ledge_A", pos: new Vector3( 14,  0.75f,  8f), scale: new Vector3(8, 1.5f, 8));
+        Box(root, "Ledge_B", pos: new Vector3( 14,  1.00f, 20f), scale: new Vector3(8, 2.0f, 8));
+        Box(root, "Ledge_C", pos: new Vector3(-12,  0.60f,  8f), scale: new Vector3(8, 1.2f, 8));
+        Box(root, "Ledge_D", pos: new Vector3(-12,  0.90f, 20f), scale: new Vector3(6, 1.8f, 6));
 
-        // Island A — 1.5 m tall, to the right (+X)
-        Box(root, "Ledge_A", pos: new Vector3(14, 0.75f,  8f), scale: new Vector3(8, 1.5f, 8));
+        // ── Large grand staircase ─────────────────────────────────────────────
+        // 12 steps × 0.45 m tall × 2.5 m deep × 18 m wide = 5.4 m total height.
+        // Centered at X=−30, ascending along +Z starting at Z=−20.
+        // Each box fills from Y=0 down so the faces are clean and continuous.
+        const int   StairCount  = 12;
+        const float StepH       = 0.45f;   // height per step
+        const float StepD       = 2.5f;    // depth per step (Z extent)
+        const float StepW       = 18f;     // width (X extent)
+        const float StairCX     = -35f;    // centre X of the staircase
+        const float StairStartZ = -20f;    // Z of the first step front face
 
-        // Island B — 2.0 m tall, further right
-        Box(root, "Ledge_B", pos: new Vector3(14, 1.00f, 20f), scale: new Vector3(8, 2.0f, 8));
+        for (int i = 1; i <= StairCount; i++)
+        {
+            float h       = i * StepH;              // surface height of this step
+            float centerY = h * 0.5f;               // box centre Y (extends to floor)
+            float centerZ = StairStartZ + (i - 0.5f) * StepD;
+            Box(root, $"GrandStair_{i:D2}",
+                pos:   new Vector3(StairCX, centerY, centerZ),
+                scale: new Vector3(StepW, h, StepD));
+        }
 
-        // Island C — 1.2 m tall, to the left (−X)
-        Box(root, "Ledge_C", pos: new Vector3(-12, 0.60f, 8f), scale: new Vector3(8, 1.2f, 8));
+        // Top landing platform (same width, 8 m deep, surface flush with step 12)
+        float topY     = StairCount * StepH;
+        float landingZ = StairStartZ + StairCount * StepD + 4f;  // 4 m past last step
+        Box(root, "GrandStair_Landing",
+            pos:   new Vector3(StairCX, topY * 0.5f, landingZ),
+            scale: new Vector3(StepW, topY, 8f));
 
-        // Island D — 1.8 m tall, far left — narrow, good for hang testing
-        Box(root, "Ledge_D", pos: new Vector3(-12, 0.90f, 20f), scale: new Vector3(6, 1.8f, 6));
+        // ── Small staircase (next to grand, same start Z, shallower steps) ───
+        // 10 steps × 0.22 m tall × 1.4 m deep × 12 m wide = 2.2 m total height.
+        // Placed to the right of the grand staircase, 4 m gap between them.
+        const int   SmallCount  = 10;
+        const float SmallH      = 0.22f;
+        const float SmallD      = 1.4f;
+        const float SmallW      = 12f;
+        const float SmallCX     = StairCX + StepW * 0.5f + SmallW * 0.5f + 4f; // 4 m gap
 
-        // ── Scattered low obstacles (misc step/bump testing) ──────────────────
+        for (int i = 1; i <= SmallCount; i++)
+        {
+            float h       = i * SmallH;
+            float centerZ = StairStartZ + (i - 0.5f) * SmallD;
+            Box(root, $"SmallStair_{i:D2}",
+                pos:   new Vector3(SmallCX, h * 0.5f, centerZ),
+                scale: new Vector3(SmallW, h, SmallD));
+        }
+
+        // Small staircase landing
+        float smallTopY     = SmallCount * SmallH;
+        float smallLandingZ = StairStartZ + SmallCount * SmallD + 4f;
+        Box(root, "SmallStair_Landing",
+            pos:   new Vector3(SmallCX, smallTopY * 0.5f, smallLandingZ),
+            scale: new Vector3(SmallW, smallTopY, 6f));
+
+        // ── Scattered low obstacles ───────────────────────────────────────────
         Box(root, "Bump_A", pos: new Vector3( 5,  0.08f, -5f), scale: new Vector3(3, 0.16f, 3));
         Box(root, "Bump_B", pos: new Vector3(-5,  0.12f, -8f), scale: new Vector3(3, 0.24f, 4));
         Box(root, "Bump_C", pos: new Vector3( 8,  0.06f, -3f), scale: new Vector3(2, 0.12f, 2));

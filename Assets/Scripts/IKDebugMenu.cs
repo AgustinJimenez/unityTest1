@@ -57,6 +57,25 @@ public class IKDebugMenu : MonoBehaviour
         new Entry { field = "ankleHeight",              label = "BL Ankle Height",          step = 0.005f, isBodyLower = true, desc = "Ankle height above surface (raySphereRadius + ankleHeightOffset). IK target is placed this far above the ground normal." },
     };
 
+    /// Slow motion (0.2x). Toggled by the O key or the Escape menu — both go through
+    /// this property so the time scale always matches the flag.
+    public bool SlowMotion
+    {
+        get => slowMotion;
+        set
+        {
+            slowMotion          = value;
+            Time.timeScale      = value ? SlowScale : 1f;
+            Time.fixedDeltaTime = 0.02f * Time.timeScale;
+        }
+    }
+
+    [Tooltip("Show the top-left diagnostics overlay (and foot gizmos). Toggle from the Escape menu.")]
+    public bool showDiagnostics = false;
+
+    [Tooltip("Show the right-side IK tuning panel (arrow-key driven). Toggle from the Escape menu.")]
+    public bool showTuningPanel = false;
+
     private FischlWorks.csHomebrewIK ik;
     private IKBodyLower bodyLower;
     private Animator anim;
@@ -65,8 +84,10 @@ public class IKDebugMenu : MonoBehaviour
     private float   holdTimer    = 0f;
     private bool    holding      = false;
     private Vector2 scrollPos;
-    private const float HoldDelay = 0.35f;
-    private const float HoldRate  = 0.07f;
+    private bool    slowMotion   = false;
+    private const float HoldDelay   = 0.35f;
+    private const float HoldRate    = 0.07f;
+    private const float SlowScale   = 0.2f;
 
     private void Awake()
     {
@@ -78,12 +99,27 @@ public class IKDebugMenu : MonoBehaviour
             Debug.LogWarning("[IKDebugMenu] No csHomebrewIK found on this GameObject or its children.");
     }
 
+    private void OnDestroy()
+    {
+        // Ensure timeScale is restored if play mode exits while slow-mo is active
+        Time.timeScale      = 1f;
+        Time.fixedDeltaTime = 0.02f;
+    }
+
     private void Update()
     {
         if (ik == null) return;
 
         var kb = Keyboard.current;
         if (kb == null) return;
+
+        // Slow-mo toggle stays available even with all panels hidden
+        if (kb.oKey.wasPressedThisFrame)
+            SlowMotion = !SlowMotion;
+
+        // Tuning keys only act when the panel is visible and the Escape menu is closed,
+        // so values can't change invisibly.
+        if (!showTuningPanel || GameMenu.IsOpen) return;
 
         // Navigate up / down
         if (kb.upArrowKey.wasPressedThisFrame)
@@ -263,6 +299,23 @@ public class IKDebugMenu : MonoBehaviour
     private void OnGUI()
     {
         if (ik == null) return;
+        if (showTuningPanel) DrawTuningPanel();
+        if (showDiagnostics) DrawDiagnostics();
+    }
+
+    // CheckSphere instead of cc.isGrounded — stable under any timeScale
+    private bool ComputeGrounded()
+    {
+        if (cc == null) return false;
+        Vector3 feetPos = transform.position + cc.center
+                        + Vector3.down * (cc.height * 0.5f - cc.radius + 0.02f);
+        return Physics.CheckSphere(feetPos, cc.radius + 0.05f,
+                   ~(1 << gameObject.layer), QueryTriggerInteraction.Ignore);
+    }
+
+    private void DrawTuningPanel()
+    {
+        bool grounded = ComputeGrounded();
 
         int   pad   = 10;
         int   lh    = 22;
@@ -365,7 +418,7 @@ public class IKDebugMenu : MonoBehaviour
             GUI.Label(new Rect(x + pad, ccY + pad + lh,     width, lh),
                 $"  Skin Width   {cc.skinWidth:F4}   [direct edit in Inspector]", ccVal);
             GUI.Label(new Rect(x + pad, ccY + pad + lh * 2, width, lh),
-                $"  Step Offset  {cc.stepOffset:F4}   Grounded: {(cc.isGrounded ? "YES" : "NO")}", ccVal);
+                $"  Step Offset  {cc.stepOffset:F4}   Grounded: {(grounded ? "YES" : "NO")}", ccVal);
         }
 
         // ── Description ──────────────────────────────────────────────────────
@@ -378,11 +431,18 @@ public class IKDebugMenu : MonoBehaviour
             { wordWrap = true, normal = { textColor = new Color(1f, 1f, 0.6f) } };
         GUI.Label(new Rect(x + pad, descY + 4, width - pad * 2, descH - 8),
                   Entries[selected].desc, desc);
+    }
 
-        // Diagnostics panel — anchored to top-left so it's always visible
+    // Diagnostics panel — anchored to top-left so it's always visible
+    private void DrawDiagnostics()
+    {
         if (anim != null)
         {
-            int   diagLines = bodyLower != null ? 14 : 9;
+            bool  grounded = ComputeGrounded();
+            int   pad      = 10;
+            int   lh       = 22;
+            float width    = 360f;
+            int   diagLines = bodyLower != null ? 15 : 10;
             float diagH     = diagLines * lh + pad * 2;
             float diagX     = pad;
             float diagY     = pad;
@@ -400,6 +460,17 @@ public class IKDebugMenu : MonoBehaviour
 
             GUI.Label(new Rect(diagX + pad, diagY + pad, width, lh), "DIAGNOSTICS", diagTitle);
 
+            // Row 0: current animation state
+            var clips = anim.GetCurrentAnimatorClipInfo(0);
+            string clipName = clips.Length > 0 ? clips[0].clip.name : "—";
+            float  clipWeight = clips.Length > 0 ? clips[0].weight : 0f;
+            var nextClips = anim.GetNextAnimatorClipInfo(0);
+            string nextStr = nextClips.Length > 0 ? $"  → {nextClips[0].clip.name} ({nextClips[0].weight:F2})" : "";
+            string slowTag = slowMotion ? "  [SLOW x0.2]" : "";
+            GUI.Label(new Rect(diagX + pad, diagY + pad + lh, width, lh),
+                $"  ANIM: {clipName} ({clipWeight:F2}){nextStr}{slowTag}",
+                new GUIStyle(GUI.skin.label) { normal = { textColor = slowMotion ? new Color(1f, 0.7f, 0.2f) : new Color(0.4f, 1f, 1f) } });
+
             Transform hips   = anim.GetBoneTransform(HumanBodyBones.Hips);
             Transform lFoot  = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
             Transform rFoot  = anim.GetBoneTransform(HumanBodyBones.RightFoot);
@@ -416,11 +487,10 @@ public class IKDebugMenu : MonoBehaviour
             float lGap    = lIKTarget.y - lBoneY;
             float rGap    = rIKTarget.y - rBoneY;
 
-            // CharacterController grounding info
+            // CharacterController grounding info — uses CheckSphere computed at top of OnGUI
             float ccBottomY = cc != null ? (transform.position.y + cc.center.y - cc.height * 0.5f) : 0f;
-            bool  grounded  = cc != null && cc.isGrounded;
 
-            float rowBase = diagY + pad + lh;
+            float rowBase = diagY + pad + lh * 2;
 
             // Row 0-1: feet
             GUI.Label(new Rect(diagX + pad, rowBase,      width, lh), $"  L foot Y: {lBoneY:F3}  knee: {lKneeY:F3}  IK tgt: {lIKTarget.y:F3}", diagVal);
@@ -438,7 +508,7 @@ public class IKDebugMenu : MonoBehaviour
                 $"  hips Y: {hipsY:F3}   bodyPos Y: {bodyPosY:F3}   root Y: {transform.position.y:F3}", diagVal);
 
             // Row 5: CC
-            string groundedStr = grounded ? "YES" : "NO  ← body floating";
+            string groundedStr = grounded ? "YES" : "NO";
             GUIStyle groundedStyle = new GUIStyle(GUI.skin.label) { normal = { textColor = grounded ? Color.green : new Color(1f,0.3f,0.3f) } };
             GUI.Label(new Rect(diagX + pad, rowBase + lh * 5, width, lh),
                 $"  CC grounded: {groundedStr}   bottom Y: {ccBottomY:F3}", groundedStyle);
@@ -492,7 +562,7 @@ public class IKDebugMenu : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (!Application.isPlaying) return;
+        if (!Application.isPlaying || !showDiagnostics) return;
 
         // ── CharacterController bottom ──────────────────────────────────────
         if (cc != null)

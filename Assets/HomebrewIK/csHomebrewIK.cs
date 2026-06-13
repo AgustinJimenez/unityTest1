@@ -82,6 +82,14 @@ namespace FischlWorks
             }
         }
 
+        // Settable so external scripts (IKBodyLower) can gate body positioning off while
+        // airborne — ApplyBodyIK shifts animator.bodyPosition regardless of IK weights,
+        // so zeroing the foot weights alone does not suppress it.
+        public bool _EnableBodyPositioning {
+            get { return enableBodyPositioning; }
+            set { enableBodyPositioning = value; }
+        }
+
         public float _WorldHeightOffset {
             get {
                 if (giveWorldHeightOffset == true)

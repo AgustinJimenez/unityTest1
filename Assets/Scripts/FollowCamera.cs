@@ -27,10 +27,15 @@ public class FollowCamera : MonoBehaviour
         var mouse = Mouse.current;
         if (mouse == null) return;
 
-        Vector2 delta = mouse.delta.ReadValue();
-        yaw   += delta.x * mouseSensitivity;
-        pitch -= delta.y * mouseSensitivity;
-        pitch  = Mathf.Clamp(pitch, minPitch, maxPitch);
+        // Camera look is suspended while the Escape menu is open (cursor is unlocked),
+        // but the camera keeps following the target.
+        if (!GameMenu.IsOpen)
+        {
+            Vector2 delta = mouse.delta.ReadValue();
+            yaw   += delta.x * mouseSensitivity;
+            pitch -= delta.y * mouseSensitivity;
+            pitch  = Mathf.Clamp(pitch, minPitch, maxPitch);
+        }
 
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
         Vector3 focusPoint  = target.position + targetOffset;
