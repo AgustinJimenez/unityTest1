@@ -18,6 +18,22 @@ public static class IKTestSetup
     // (takeoff+air+land, looping), so long airtime visibly restarts the jump at the peak.
     private const string JumpAirFbxPath         = "Assets/ThirdParty/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx";
     private const string JumpLandFbxPath        = "Assets/ThirdParty/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Land.fbx";
+    // Kimodo-generated crawl motions (Humanoid, retargeted via KimodoImport).
+    private const string KimodoFolder         = "Assets/_Game/Resources/KimodoMotions/";
+    // Crouch uses authored DoubleL clips, not Kimodo: text-to-motion could not produce
+    // a stable held crouch idle (it kept yielding waist-bends / kneels / sprawls). The
+    // DoubleL "One Hand Up" crouch set is a proper feet-flat half-crouch — Idle for the
+    // held pose, Crouch_F for the slow forward sneak — and both are already Humanoid.
+    private const string DoubleLCrouchFolder  = "Assets/ThirdParty/DoubleL/One Hand Up/Movement/Crouch/";
+    private const string CrouchIdleFbxPath    = DoubleLCrouchFolder + "Idle/Idle/OneHand_Up_Crouch_Idle_1.fbx";
+    private const string CrouchWalkFbxPath    = DoubleLCrouchFolder + "Base/OneHand_Up_Crouch_F.fbx";
+    private const string CrawlIdleFbxPath     = KimodoFolder + "KimodoCrawlIdle.fbx";
+    private const string CrawlForwardFbxPath  = KimodoFolder + "KimodoCrawlForward.fbx";
+    private const string CrawlLeftFbxPath     = KimodoFolder + "KimodoCrawlLeft.fbx";
+    private const string CrawlRightFbxPath    = KimodoFolder + "KimodoCrawlRight.fbx";
+    // Alternate playable characters for the in-menu Character switcher (Humanoid models).
+    private const string DoubleLCharacterPrefab = "Assets/ThirdParty/DoubleL/Model/Armature (1).prefab";
+    private const string RPGCharacterPrefab     = "Assets/ThirdParty/ExplosiveLLC/RPG Character Mecanim Animation Pack FREE/Prefabs/Character/RPG-Character.prefab";
     private const string GeneratedControllerPath = "Assets/_Game/Animation/FootIK_Demo.controller";
     private const string PlayerName             = "Player";
     private const string AutoRunPrefsKey        = "IKTestSetup.AutoRun";
@@ -200,8 +216,29 @@ public static class IKTestSetup
         // --- Escape menu (toggles the debug overlays) ---
         GameMenu menu = player.GetComponent<GameMenu>();
         if (menu == null) menu = Undo.AddComponent<GameMenu>(player);
+
+        // --- Character switcher (runtime model swap, listed in the menu) ---
+        CharacterSwitcher switcher = player.GetComponent<CharacterSwitcher>();
+        if (switcher == null) switcher = Undo.AddComponent<CharacterSwitcher>(player);
+        var charEntries = new System.Collections.Generic.List<CharacterSwitcher.Entry>
+        {
+            new CharacterSwitcher.Entry { name = "Mannequin", prefab = null, scale = 1f },
+        };
+        foreach (var pair in new[] {
+            ("DoubleL", DoubleLCharacterPrefab) })   // confirmed Humanoid avatar + skinned mesh
+        {
+            var pf = AssetDatabase.LoadAssetAtPath<GameObject>(pair.Item2);
+            if (pf != null)
+                charEntries.Add(new CharacterSwitcher.Entry { name = pair.Item1, prefab = pf, scale = 1f });
+            else
+                Debug.LogWarning($"[Setup] Character prefab not found: {pair.Item2}");
+        }
+        // 'animator' is on the original model child; that GameObject is the index-0 model.
+        switcher.Configure(controller, animator.gameObject, charEntries);
+
         SerializedObject soMenu = new SerializedObject(menu);
-        soMenu.FindProperty("ikDebugMenu").objectReferenceValue = dbg;
+        soMenu.FindProperty("ikDebugMenu").objectReferenceValue       = dbg;
+        soMenu.FindProperty("characterSwitcher").objectReferenceValue = switcher;
         soMenu.ApplyModifiedProperties();
 
         // --- Camera ---
@@ -266,7 +303,10 @@ public static class IKTestSetup
         // Swapping an input clip (e.g. the air animation) must invalidate it too.
         foreach (var p in new[] {
             IdlePrefabPath, IdleFbxPath, WalkFbxPath, HangIdleDaePath,
-            JumpBeginFbxPath, JumpAirFbxPath, JumpLandFbxPath })
+            JumpBeginFbxPath, JumpAirFbxPath, JumpLandFbxPath,
+            CrouchIdleFbxPath, CrouchWalkFbxPath, CrawlIdleFbxPath,
+            CrawlForwardFbxPath, CrawlLeftFbxPath, CrawlRightFbxPath,
+            DoubleLCharacterPrefab, RPGCharacterPrefab })
             sb.Append(p).Append('=').Append(AssetDatabase.AssetPathToGUID(p)).Append(';');
 
         using (var md5 = System.Security.Cryptography.MD5.Create())
@@ -426,6 +466,9 @@ public static class IKTestSetup
         ac.AddParameter("IsGrounded",       AnimatorControllerParameterType.Bool);
         ac.AddParameter("VerticalVelocity", AnimatorControllerParameterType.Float);
         ac.AddParameter("TimeInAir",        AnimatorControllerParameterType.Float);
+        ac.AddParameter("IsCrouching",      AnimatorControllerParameterType.Bool);
+        ac.AddParameter("IsCrawling",       AnimatorControllerParameterType.Bool);
+        ac.AddParameter("MoveX",            AnimatorControllerParameterType.Float);
 
         // Rebuild the base layer state machine
         var layer = ac.layers[0];
@@ -531,10 +574,111 @@ public static class IKTestSetup
             toLoco.hasExitTime = false;
         }
 
+        // ── Crouch / Crawl (C key) ────────────────────────────────────────────
+        BuildCrouchCrawlStates(ac, sm, locoState);
+
         EditorUtility.SetDirty(ac);
         AssetDatabase.SaveAssets();
         Debug.Log("[Setup] Built FootIK_Demo.controller.");
         return ac;
+    }
+
+    // Crouch (1D Idle↔Walk on Speed) and Crawl (2D MoveX/Speed) states driven by
+    // SimpleCharacter's C-key stance machine. Skipped silently if the Kimodo clips
+    // aren't present yet, so the controller still builds without them.
+    private static void BuildCrouchCrawlStates(AnimatorController ac,
+        AnimatorStateMachine sm, AnimatorState locoState)
+    {
+        var crouchIdle   = LoadFirstClip(CrouchIdleFbxPath);
+        var crouchWalk   = LoadFirstClip(CrouchWalkFbxPath);
+        var crawlIdle    = LoadFirstClip(CrawlIdleFbxPath);
+        var crawlForward = LoadFirstClip(CrawlForwardFbxPath);
+        var crawlLeft    = LoadFirstClip(CrawlLeftFbxPath);
+        var crawlRight   = LoadFirstClip(CrawlRightFbxPath);
+
+        bool hasCrouch = crouchIdle != null && crouchWalk != null;
+        bool hasCrawl  = crawlIdle != null && crawlForward != null
+                      && crawlLeft != null && crawlRight != null;
+
+        if (!hasCrouch) Debug.LogWarning("[Setup] Crouch clips not found — Crouch state skipped.");
+        if (!hasCrawl)  Debug.LogWarning("[Setup] Crawl clips not found — Crawl state skipped.");
+
+        AnimatorState crouchState = null, crawlState = null;
+
+        if (hasCrouch)
+        {
+            crouchState = sm.AddState("Crouch", new Vector3(200, 320));
+            var ct = new BlendTree();
+            AssetDatabase.AddObjectToAsset(ct, GeneratedControllerPath);
+            ct.name                   = "Crouch";
+            ct.blendType              = BlendTreeType.Simple1D;
+            ct.blendParameter         = "Speed";
+            ct.useAutomaticThresholds = false;
+            ct.AddChild(crouchIdle, 0f);
+            ct.AddChild(crouchWalk, 1f);
+            crouchState.motion = ct;
+
+            // Locomotion ↔ Crouch
+            var toCrouch = locoState.AddTransition(crouchState);
+            toCrouch.AddCondition(AnimatorConditionMode.If,    0, "IsCrouching");
+            toCrouch.AddCondition(AnimatorConditionMode.IfNot, 0, "IsCrawling");
+            toCrouch.hasExitTime = false;
+            toCrouch.duration    = 0.2f;
+
+            var crouchToLoco = crouchState.AddTransition(locoState);
+            crouchToLoco.AddCondition(AnimatorConditionMode.IfNot, 0, "IsCrouching");
+            crouchToLoco.AddCondition(AnimatorConditionMode.IfNot, 0, "IsCrawling");
+            crouchToLoco.hasExitTime = false;
+            crouchToLoco.duration    = 0.2f;
+        }
+
+        if (hasCrawl)
+        {
+            crawlState = sm.AddState("Crawl", new Vector3(200, 420));
+            var wt = new BlendTree();
+            AssetDatabase.AddObjectToAsset(wt, GeneratedControllerPath);
+            wt.name            = "Crawl";
+            // 2D Cartesian on (MoveX, Speed): idle at origin, forward up the Speed
+            // axis, left/right out the MoveX axis. Pure side input lands (±1, 1)
+            // exactly on the side clip; pure forward (0, 1) on the forward clip.
+            wt.blendType       = BlendTreeType.FreeformCartesian2D;
+            wt.blendParameter  = "MoveX";
+            wt.blendParameterY = "Speed";
+            wt.AddChild(crawlIdle,    new Vector2( 0f, 0f));
+            wt.AddChild(crawlForward, new Vector2( 0f, 1f));
+            wt.AddChild(crawlLeft,    new Vector2(-1f, 1f));
+            wt.AddChild(crawlRight,   new Vector2( 1f, 1f));
+            crawlState.motion = wt;
+
+            // Enter crawl from Locomotion (hold C from standing) or Crouch (hold C
+            // while crouched). Leave to whichever stance the release resolves to.
+            var locoToCrawl = locoState.AddTransition(crawlState);
+            locoToCrawl.AddCondition(AnimatorConditionMode.If, 0, "IsCrawling");
+            locoToCrawl.hasExitTime = false;
+            locoToCrawl.duration    = 0.25f;
+
+            var crawlToLoco = crawlState.AddTransition(locoState);
+            crawlToLoco.AddCondition(AnimatorConditionMode.IfNot, 0, "IsCrawling");
+            crawlToLoco.AddCondition(AnimatorConditionMode.IfNot, 0, "IsCrouching");
+            crawlToLoco.hasExitTime = false;
+            crawlToLoco.duration    = 0.25f;
+
+            if (crouchState != null)
+            {
+                var crouchToCrawl = crouchState.AddTransition(crawlState);
+                crouchToCrawl.AddCondition(AnimatorConditionMode.If, 0, "IsCrawling");
+                crouchToCrawl.hasExitTime = false;
+                crouchToCrawl.duration    = 0.25f;
+
+                var crawlToCrouch = crawlState.AddTransition(crouchState);
+                crawlToCrouch.AddCondition(AnimatorConditionMode.IfNot, 0, "IsCrawling");
+                crawlToCrouch.AddCondition(AnimatorConditionMode.If,    0, "IsCrouching");
+                crawlToCrouch.hasExitTime = false;
+                crawlToCrouch.duration    = 0.25f;
+            }
+        }
+
+        if (hasCrouch || hasCrawl) Debug.Log("[Setup] Crouch/Crawl states wired.");
     }
 
     // ── Level geometry ───────────────────────────────────────────────────────

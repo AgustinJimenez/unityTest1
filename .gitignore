@@ -87,6 +87,10 @@ UpgradeLog.htm
 
 # Accidental Windows shell redirect artifact (echo ... > nul)
 nul
+*.stackdump
 
 # Generated animation inventory (scratch reference, regenerable)
 animation_inventory.txt
+
+# Large generated motion FBX (Kimodo/GVHMR) — kept local only, not in git
+[Aa]ssets/_Game/Resources/
