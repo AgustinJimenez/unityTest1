@@ -34,6 +34,7 @@ public static class IKTestSetup
     // Alternate playable characters for the in-menu Character switcher (Humanoid models).
     private const string DoubleLCharacterPrefab = "Assets/ThirdParty/DoubleL/Model/Armature (1).prefab";
     private const string RPGCharacterPrefab     = "Assets/ThirdParty/ExplosiveLLC/RPG Character Mecanim Animation Pack FREE/Prefabs/Character/RPG-Character.prefab";
+    private const string CasualManFbxPath       = "Assets/ThirdParty/CasualMan/casualman_rigged.fbx";
     private const string GeneratedControllerPath = "Assets/_Game/Animation/FootIK_Demo.controller";
     private const string PlayerName             = "Player";
     private const string AutoRunPrefsKey        = "IKTestSetup.AutoRun";
@@ -225,7 +226,8 @@ public static class IKTestSetup
             new CharacterSwitcher.Entry { name = "Mannequin", prefab = null, scale = 1f },
         };
         foreach (var pair in new[] {
-            ("DoubleL", DoubleLCharacterPrefab) })   // confirmed Humanoid avatar + skinned mesh
+            ("DoubleL",    DoubleLCharacterPrefab),
+            ("Casual Man", CasualManFbxPath) })
         {
             var pf = AssetDatabase.LoadAssetAtPath<GameObject>(pair.Item2);
             if (pf != null)
@@ -306,7 +308,7 @@ public static class IKTestSetup
             JumpBeginFbxPath, JumpAirFbxPath, JumpLandFbxPath,
             CrouchIdleFbxPath, CrouchWalkFbxPath, CrawlIdleFbxPath,
             CrawlForwardFbxPath, CrawlLeftFbxPath, CrawlRightFbxPath,
-            DoubleLCharacterPrefab, RPGCharacterPrefab })
+            DoubleLCharacterPrefab, RPGCharacterPrefab, CasualManFbxPath })
             sb.Append(p).Append('=').Append(AssetDatabase.AssetPathToGUID(p)).Append(';');
 
         using (var md5 = System.Security.Cryptography.MD5.Create())
